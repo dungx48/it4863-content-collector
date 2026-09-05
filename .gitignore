@@ -2,5 +2,7 @@
 .cache/
 **/target/
 archive/
-output/
+output/*
+!output/demo-input.txt
+!output/demo-n06/
 *.log
