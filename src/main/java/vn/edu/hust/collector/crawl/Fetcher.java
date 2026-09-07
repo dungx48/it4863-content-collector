@@ -6,8 +6,11 @@ import java.time.Duration;
 import java.util.*;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
+/** Tải tài nguyên HTTP có kiểm tra domain, robots.txt, redirect và kích thước. */
 public class Fetcher {
     public static final String AGENT = "HustCourseBot";
+
+    /** Phản hồi cuối sau redirect; body chỉ có khi HTTP 200. */
     public record Fetched(String url, int status, String mime, byte[] bytes) {}
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build();
     private final UrlPolicy policy;
@@ -15,9 +18,15 @@ public class Fetcher {
     private final long delay;
     private final Map<String, Long> lastRequest = new HashMap<>();
     private final Map<String, crawlercommons.robots.BaseRobotRules> robots = new HashMap<>();
+    /**
+     * @param maxBytes số byte tối đa của một tài nguyên
+     * @param delay khoảng nghỉ tối thiểu giữa hai request cùng host, theo mili giây
+     */
     public Fetcher(UrlPolicy policy, int maxBytes, long delay) {
         this.policy = policy; this.maxBytes = maxBytes; this.delay = delay;
     }
+
+    /** Kiểm tra đích, áp delay theo host rồi gửi một GET không tự theo redirect. */
     private synchronized HttpResponse<java.io.InputStream> request(String url, String domain) throws Exception {
         policy.checkFetch(url, domain);
         String host = URI.create(url).getHost();
@@ -27,6 +36,7 @@ public class Fetcher {
         return client.send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30))
             .header("User-Agent", AGENT + "/0.1 (IT4863 educational crawler)").GET().build(), HttpResponse.BodyHandlers.ofInputStream());
     }
+    /** Nạp và cache robots.txt theo origin, sau đó kiểm tra URL được phép tải. */
     private boolean allowed(String url, String domain) throws Exception {
         URI uri = URI.create(url);
         String origin = uri.getScheme() + "://" + uri.getAuthority();
@@ -46,6 +56,7 @@ public class Fetcher {
         if (rules.getCrawlDelay() > delay) Thread.sleep(Math.min(rules.getCrawlDelay(), 60_000));
         return rules.isAllowed(url);
     }
+    /** Tải URL qua tối đa năm redirect và kiểm tra lại policy ở mỗi chặng. */
     public Fetched fetch(String url, String domain) throws Exception {
         String current = url;
         for (int redirects = 0; redirects <= 5; redirects++) {

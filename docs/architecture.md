@@ -1,6 +1,6 @@
 # Thiết kế chi tiết — IT4863 Content Collector
 
-Ngày đối chiếu mã nguồn: **05/09/2026**. Tài liệu mô tả triển khai trong `src/`, không phải đề xuất hệ thống tương lai. Hướng dẫn chạy trên máy mới: [project-context.md](project-context.md).
+Ngày đối chiếu mã nguồn: **08/09/2026**. Tài liệu mô tả triển khai trong `src/`, không phải đề xuất hệ thống tương lai. Hướng dẫn chạy trên máy mới: [project-context.md](project-context.md).
 
 Xem trước [7 sơ đồ thiết kế có giải thích](design-diagrams.md) nếu muốn hình dung hệ thống trước khi đọc chi tiết.
 
@@ -8,7 +8,7 @@ Xem trước [7 sơ đồ thiết kế có giải thích](design-diagrams.md) n�
 
 Project biến danh sách URL HUST có sẵn thành tập văn bản phục vụ bước tìm kiếm sau này. Mỗi URL được kiểm tra, tải, bóc tách, quyết định giữ/bỏ và ghi kết quả có lý do. Văn bản tiếng Việt giữ nguyên dấu.
 
-Đầu vào là một URL hoặc file UTF-8 theo dạng danh sách N06. Đầu ra là JSONL và báo cáo JSON trên ổ đĩa. Chương trình chạy batch tuần tự rồi kết thúc, không có dịch vụ chạy nền.
+Đầu vào là một URL hoặc file UTF-8 theo dạng danh sách N06. Batch xuất JSON/JSONL ra ổ đĩa. Chế độ `--serve` mở giao diện và API trên localhost để trình diễn một URL; dừng bằng Ctrl+C.
 
 | Đang có | Chưa triển khai |
 |---|---|
@@ -16,7 +16,7 @@ Project biến danh sách URL HUST có sẵn thành tập văn bản phục vụ
 | Kiểm tra domain, IP, robots.txt, redirect | Đăng nhập, quản lý phiên người dùng |
 | Bóc tách HTML và tài liệu trong allowlist | JavaScript renderer, pipeline OCR được cấu hình/kiểm chứng |
 | Lọc bằng quy tắc, hash text | Tìm kiếm, ranking, highlight, index Lucene |
-| JSONL và thống kê một lần chạy | Database, REST API, frontend, resume |
+| JSON/JSONL, thống kê và giao diện demo local | Database, API triển khai từ xa, resume |
 
 README cũ nhắc bản full-stack lưu riêng, nhưng `archive/` bị Git bỏ qua và không có trong checkout đã kiểm tra. Build không phụ thuộc thư mục đó.
 
@@ -24,7 +24,14 @@ README cũ nhắc bản full-stack lưu riêng, nhưng `archive/` bị Git bỏ 
 
 ```mermaid
 flowchart TD
-    CLI[Collector.main: CLI] --> Input[Đọc danh sách và limit]
+    CLI[Collector.main] --> Mode{Chế độ}
+    Mode -->|url/input| Input[Đọc danh sách và limit]
+    Mode -->|serve| UI[HTML/CSS/JS trên localhost]
+    UI --> Suggest[GET /api/whitelist]
+    Suggest --> White[N06_Ctrl+F.txt trong classpath]
+    UI --> API[POST /api/extract]
+    Import[File TXT đọc trong trình duyệt] --> UI
+    API --> Policy
     Input --> Batch[Collector.run: vòng lặp tuần tự]
     Batch --> Policy[UrlPolicy: chuẩn hóa và kiểm tra]
     Policy --> Seen{URL đã gặp?}
@@ -35,7 +42,7 @@ flowchart TD
     Keep -->|Không| Result
     Keep -->|Có| Hash{SHA-256 text đã gặp?}
     Hash -->|Có| Result
-    Hash -->|Chưa| Docs[documents.jsonl]
+    Hash -->|Chưa| Docs[documents.json + documents.jsonl]
     Docs --> Result
     Policy -->|Bị từ chối| Result
     Fetch -->|Lỗi hoặc bị chặn| Result
@@ -45,7 +52,7 @@ flowchart TD
     Next -->|Không| Summary[summary.json]
 ```
 
-Các module chạy cùng JVM, gọi phương thức trực tiếp. Chỉ `Fetcher` thực hiện HTTP; `Collector` ghi dữ liệu cuối ra filesystem. Không có queue, giao tiếp mạng nội bộ hoặc persistence ngoài file.
+Các module chạy cùng JVM, gọi phương thức trực tiếp. Chỉ `Fetcher` tải website; `Collector` ghi file. `DemoServer` dùng HTTP loopback để phục vụ giao diện/API local, không có queue, database hoặc dịch vụ từ xa.
 
 ### Stack và đóng gói
 
@@ -69,18 +76,19 @@ Maven Shade tạo `target/collector.jar` kèm dependency, đặt main class là 
 | Mã nguồn | Phương thức chính | Trách nhiệm |
 |---|---|---|
 | [Collector.java](../src/main/java/vn/edu/hust/collector/Collector.java) | `main`, `readInput`, `run`, `process`, `fetchWithRetry` | CLI, batch, retry, dedup, đếm và ghi file |
+| [DemoServer.java](../src/main/java/vn/edu/hust/collector/DemoServer.java) | `start`, `handle`, `extract`, `whitelist` | Web tĩnh, API gợi ý whitelist và API bóc tách một URL trên localhost |
 | [UrlPolicy.java](../src/main/java/vn/edu/hust/collector/crawl/UrlPolicy.java) | `normalize`, `inDomain`, `loginUrl`, `checkFetch` | Quy tắc URL và kiểm tra đích tải |
 | [Fetcher.java](../src/main/java/vn/edu/hust/collector/crawl/Fetcher.java) | `fetch`, `allowed`, `request` | HTTP, robots cache, redirect, delay, giới hạn byte |
-| [ContentExtractor.java](../src/main/java/vn/edu/hust/collector/extract/ContentExtractor.java) | `extract`, `clean` | Nhận dạng, text/title, quyết định giữ/bỏ |
+| [ContentExtractor.java](../src/main/java/vn/edu/hust/collector/extract/ContentExtractor.java) | `extract`, `extractLinks`, `clean` | Nhận dạng, title/text/links, quyết định giữ/bỏ |
 
 - `Downloader.fetch(url)` là interface nội bộ để truyền cách tải vào Collector. Production dùng retry; test dùng dữ liệu giả, không cần gọi website thật.
 - `Fetched(url, status, mime, bytes)` mang phản hồi HTTP cuối về collector.
-- `Extracted(title, text, type, keep, reason)` mang kết quả bóc tách và quyết định giữ/bỏ.
+- `Extracted(title, text, type, links, keep, reason)` mang kết quả bóc tách và quyết định giữ/bỏ.
 - `Outcome(result, document)` ghép báo cáo URL với document tùy chọn; chỉ KEPT tạo document.
 - `Result`, `Document`, `Summary` là Java record, xác định trực tiếp tên trường JSON đầu ra.
 - `validateDomain` có trong UrlPolicy nhưng CLI chưa gọi. Domain production cố định `hust.edu.vn`.
 
-## 4. CLI và đọc input
+## 4. Các chế độ đầu vào
 
 | Tham số | Quy tắc |
 |---|---|
@@ -89,8 +97,28 @@ Maven Shade tạo `target/collector.jar` kèm dependency, đặt main class là 
 | `--limit` | Số dòng URL xử lý; mặc định 100, CLI chấp nhận 1–50.000 |
 | `--output` | Thư mục mới; mặc định `output/run-<Instant>` với dấu `:` đổi thành `-` |
 | `--help` | In hướng dẫn rồi thoát; không có tham số cũng in help |
+| `--serve [port]` | Chạy giao diện loopback; port mặc định 8080, xử lý tuần tự |
 
-CLI nhận cặp option/value, từ chối option lạ/lặp và yêu cầu đúng một trong `--url`, `--input`. Các ràng buộc này nằm ở `main`; gọi `run` trực tiếp từ Java chỉ kiểm tra limit dương, không có trần 50.000.
+Ngoài nhánh đặc biệt `--serve [port]`, CLI nhận cặp option/value, từ chối option lạ/lặp và yêu cầu đúng một trong `--url`, `--input`. Các ràng buộc này nằm ở `main`; gọi `run` trực tiếp từ Java chỉ kiểm tra limit dương, không có trần 50.000.
+
+### Chế độ web và API
+
+Server bind địa chỉ loopback, dùng một executor đơn luồng và tắt cache cho resource/JSON. Đây là API hỗ trợ demo local, không có xác thực hoặc thiết kế để triển khai công khai.
+
+| Method/path | Đầu vào | Đầu ra |
+|---|---|---|
+| `GET /` | Không | Giao diện HTML |
+| `GET /styles.css`, `GET /app.js` | Không | Resource frontend |
+| `GET /api/whitelist?q=...` | Query tối đa 300 ký tự | `success`, tổng URL và tối đa 20 URL khớp |
+| `POST /api/extract` | JSON `{ "url": "..." }`, tối đa 8.192 byte | Title, text, links, HTTP/MIME/thời gian hoặc lỗi có reason |
+
+`POST /api/extract` chuẩn hóa URL, chỉ nhận HUST, bỏ login, tải qua Fetcher rồi dùng cùng ContentExtractor với CLI. API trả 200 khi thành công, 400 cho request/URL sai, 413 khi request quá lớn, 422 khi nội dung bị loại và 502 khi tải/HTTP/parser lỗi.
+
+Chế độ web đọc `N06_Ctrl+F.txt` từ classpath một lần khi khởi động, bỏ phần giới thiệu, dấu phẩy cuối và URL trùng. Bản hiện tại có 9.516 URL duy nhất. Tìm kiếm không phân biệt hoa thường.
+
+File TXT do người dùng chọn được JavaScript đọc cục bộ, không upload. Client dùng regex tìm URL, chỉ giữ HUST/subdomain, loại trùng và giới hạn 10 MiB/50.000 URL; tối đa 200 kết quả phù hợp được vẽ mỗi lần. Chọn một URL chỉ điền vào form, không tự gửi request và không chạy batch.
+
+### Đọc input CLI
 
 `readInput` bỏ BOM, strip khoảng trắng và **chỉ giữ dòng bắt đầu chính xác bằng `http://` hoặc `https://` chữ thường**. Dòng giới thiệu, dòng trống, chuỗi thiếu prefix bị bỏ hoàn toàn, không xuất Result. Dòng có prefix nhưng URL sai vẫn vào batch. Một dấu phẩy cuối dòng được bỏ ở `normalize`.
 
@@ -168,13 +196,24 @@ Tika detect từ byte và path URL. Chọn nhánh HTML nếu loại detect hoặ
 
 1. Jsoup parse byte stream với charset tự nhận diện và base URI là URL cuối.
 2. Có `input[type=password]` thì bỏ `LOGIN_REQUIRED`, dù HTTP 200.
-3. Xóa `script,style,noscript,nav,header,footer,aside,form,iframe,.breadcrumb,.breadcrumbs,.social-share`.
-4. Chọn phần tử khớp đầu tiên trong DOM với selector `article,main,[role=main],.news-content,.detail-content,.entry-content,#news-bodyhtml`; không có thì dùng body. Thứ tự selector không phải cơ chế chấm điểm ưu tiên article hơn main.
-5. Text = `clean(main.text())`. Title = h1 đầu tiên còn lại trong document hoặc title; h1 không bắt buộc nằm trong vùng main. Title không gọi clean riêng.
+3. Xóa `script,style,noscript,nav,header,footer,aside,form,iframe,.breadcrumb,.breadcrumbs,.social-share,.share-icons`.
+4. Thử selector theo thứ tự ưu tiên: `#news-bodyhtml`, `.entry-content`, `.elementor-widget-theme-post-content`, `.news-content`, `.detail-content`, `article`, `main`, `[role=main]`; không có thì dùng body.
+5. Text = `clean(main.text())`. Title lấy h1 đầu tiên hoặc title trước khi xóa vùng phụ và được clean. Trong vùng chính, lấy liên kết và nguồn ảnh HTTP(S) đầy đủ kèm mô tả; xem [quy tắc liên kết](demo.md).
 6. Giữ khi `text.length() >= 120` và độ dài text trong thẻ a `< 0,55 × text.length()`.
 7. Title chữ thường chứa `404`, `page not found` hoặc `access denied` luôn bị `SOFT_ERROR`.
 
 Text rỗng trả `EMPTY_OR_JS_REQUIRED`; ngắn/nhiều link trả `SHORT_OR_LINK_LIST`. Đây là heuristic, không chứng minh trang cần JavaScript và không bảo đảm danh mục luôn bị bỏ. `String.length()` dùng đơn vị UTF-16 của Java.
+
+### Liên kết và ảnh
+
+Extractor duyệt `a[href]` và các ảnh có `src`, `data-src`, `data-lazy-src` hoặc `data-original` theo thứ tự DOM. URL được resolve bằng base URI của Jsoup và chỉ giữ HTTP(S) không có credentials.
+
+- Link: mô tả ưu tiên anchor text → `aria-label` → `alt` ảnh con → `title`.
+- Ảnh: URL ưu tiên `data-src` → `data-lazy-src` → `data-original` → `src`.
+- Ảnh: mô tả ưu tiên `alt` → `figcaption` gần nhất → `title`.
+- `LinkedHashSet<Link>` loại cặp URL/text trùng và giữ thứ tự đầu tiên.
+
+Một ảnh nằm trong thẻ `a` có thể tạo hai phần tử: URL đích của thẻ `a` và URL file ảnh. Text mô tả có thể rỗng. Extractor không crawl hoặc tải các URL tìm thấy.
 
 ### Tài liệu
 
@@ -194,16 +233,19 @@ Hash là SHA-256 trên UTF-8 của **text sau clean**, biểu diễn hex chữ t
 
 JSONL UTF-8 có một object trên mỗi dòng, không phải mảng JSON. Tên trường lấy trực tiếp từ Java record; chưa có schema version.
 
-### documents.jsonl — chỉ nội dung KEPT
+### documents.json và documents.jsonl — chỉ nội dung KEPT
 
 | Trường | Kiểu | Ý nghĩa |
 |---|---|---|
 | `url` | string | URL cuối sau redirect |
 | `title` | string | Tiêu đề HTML hoặc metadata/path tài liệu; có thể rỗng |
 | `text` | string | Nội dung chuẩn hóa, không rỗng |
+| `links` | array | Các object `{url, text}` của liên kết/ảnh trong vùng bài; PDF/Office hiện rỗng |
 | `contentType` | string | text/html hoặc loại Tika detect |
 | `contentHash` | string | SHA-256 text, 64 ký tự hex |
 | `fetchedAt` | string | UTC ISO-8601, tạo sau bóc tách/hash, không phải Last-Modified của nguồn |
+
+`documents.json` xuất cùng record dưới dạng mảng có thụt dòng để trình diễn. Mảng chỉ hoàn tất khi batch kết thúc bình thường; JSONL thích hợp đọc tiến độ hoặc kết quả bị ngắt.
 
 ### results.jsonl — mỗi dòng URL đã xử lý
 
@@ -283,6 +325,7 @@ Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời đi�
 | Robots, redirect, size, delay | Fetcher | FetcherTest với server cục bộ |
 | Vùng nội dung, ngưỡng giữ/bỏ | ContentExtractor | ContentExtractorTest và HTML có nhãn |
 | Loại tài liệu mới | Allowlist extractor, dependency nếu cần | Fixture định dạng đó và JAR đóng gói |
+| Whitelist, import TXT, giao diện/API | DemoServer và `resources/web/` | DemoServerTest, `node --check` và smoke test trình duyệt |
 
 Hướng mở rộng đề xuất, **chưa triển khai**: đánh giá mẫu nhiều subdomain/định dạng trước khi chỉnh heuristic; thêm test retry/lỗi; manifest lần chạy/schema version nếu cần tái lập; checkpoint/raw storage nếu chạy dài; sau đó dùng documents cho index tìm kiếm. Sửa normalization sẽ ảnh hưởng hash/dedup nên cần đánh giá lại mẫu.
 

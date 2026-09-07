@@ -1,6 +1,6 @@
 # Mô hình thiết kế bằng sơ đồ
 
-Đọc từ trên xuống: hệ thống làm gì → class nào phụ trách → một URL đi qua các bước nào → dữ liệu được ghi ở đâu. Các sơ đồ mô tả code hiện tại, đối chiếu ngày 05/09/2026. Quy tắc đầy đủ nằm trong [thiết kế chi tiết](architecture.md).
+Đọc từ trên xuống: hệ thống làm gì → class nào phụ trách → một URL đi qua các bước nào → dữ liệu được ghi ở đâu. Các sơ đồ mô tả lõi batch và chế độ web demo, đối chiếu ngày 08/09/2026. Quy tắc đầy đủ nằm trong [thiết kế chi tiết](architecture.md).
 
 Các khối `mermaid` hiển thị thành hình trong trình xem Markdown hỗ trợ Mermaid, chẳng hạn trên GitHub. Nếu IDE chỉ hiện mã sơ đồ, mở file bằng chế độ Markdown preview có hỗ trợ Mermaid.
 
@@ -8,11 +8,12 @@ Các khối `mermaid` hiển thị thành hình trong trình xem Markdown hỗ t
 
 ```mermaid
 flowchart LR
-    User["Bạn chạy lệnh Java"] --> App
-    Input["Một URL hoặc file danh sách N06"] --> App
+    User["Bạn chạy lệnh Java hoặc mở web local"] --> App
+    Input["Một URL hoặc file TXT"] --> App
+    White["Whitelist N06_Ctrl+F<br/>9.516 URL"] --> App
     subgraph Local["Máy của bạn"]
-        App["Content Collector<br/>Một chương trình Java CLI"]
-        Docs["documents.jsonl<br/>Text được giữ để dùng cho tìm kiếm"]
+        App["Content Collector<br/>CLI + web demo local"]
+        Docs["documents.json + JSONL<br/>Title, text, liên kết và ảnh"]
         Results["results.jsonl<br/>Kết quả và lý do của từng URL"]
         Summary["summary.json<br/>Thống kê khi batch kết thúc"]
         App --> Docs
@@ -27,17 +28,25 @@ flowchart LR
 
 Bạn cung cấp URL. Collector tải và chuyển nội dung thành văn bản cùng báo cáo. Các file output nằm trên máy chạy lệnh; chức năng index/tìm kiếm sẽ là bước phát triển sau.
 
-## 2. Bốn class phối hợp như thế nào?
+## 2. Các class phối hợp như thế nào?
 
 ```mermaid
 flowchart TB
     CLI["Lệnh java -jar collector.jar"] --> C
+    Browser["Trình duyệt localhost"] --> D
+    TextFile["TXT import<br/>đọc tại trình duyệt"] --> Browser
     subgraph JVM["Cùng một JVM — gọi phương thức trực tiếp"]
         C["Collector<br/>Điều phối, retry, chống trùng, ghi file"]
+        D["DemoServer<br/>Web + API extract/whitelist"]
+        W["N06_Ctrl+F.txt<br/>9.516 URL"]
         P["UrlPolicy<br/>Chuẩn hóa URL, kiểm tra domain và IP"]
         F["Fetcher<br/>Robots, HTTP, redirect, giới hạn tải"]
-        E["ContentExtractor<br/>Lấy title/text, quyết định giữ hay bỏ"]
+        E["ContentExtractor<br/>Lấy title/text/link/ảnh, giữ hay bỏ"]
         C -->|"1. Chuẩn hóa và kiểm tra đầu vào"| P
+        D --> P
+        D --> F
+        D --> E
+        W --> D
         C -->|"2. Tải qua Downloader và fetchWithRetry"| F
         F -->|"Kiểm tra đích trước request"| P
         C -->|"3. Truyền byte, URL cuối và MIME"| E
@@ -54,6 +63,7 @@ flowchart TB
 | Nếu muốn hiểu hoặc sửa… | Đọc class |
 |---|---|
 | Lệnh chạy, limit, retry, chống trùng, output | [Collector](../src/main/java/vn/edu/hust/collector/Collector.java) |
+| Giao diện, gợi ý whitelist và API một URL | [DemoServer](../src/main/java/vn/edu/hust/collector/DemoServer.java) và [web](../src/main/resources/web/) |
 | URL nào được chấp nhận | [UrlPolicy](../src/main/java/vn/edu/hust/collector/crawl/UrlPolicy.java) |
 | Cách tải và xử lý robots/redirect | [Fetcher](../src/main/java/vn/edu/hust/collector/crawl/Fetcher.java) |
 | Vì sao nội dung được giữ/bỏ | [ContentExtractor](../src/main/java/vn/edu/hust/collector/extract/ContentExtractor.java) |
@@ -90,9 +100,9 @@ sequenceDiagram
         W-->>F: HTTP 200 và body
         F-->>C: Fetched: URL cuối, status, MIME, bytes
         C->>E: extract(bytes, finalUrl, MIME)
-        E-->>C: Extracted: title, text, type, keep=true
+        E-->>C: Extracted: title, text, type, links, keep=true
         C->>C: SHA-256 text, kiểm tra và thêm seenHashes
-        C->>O: Ghi Document vào documents.jsonl và flush
+        C->>O: Ghi Document vào documents.json và JSONL
         C->>O: Ghi Result KEPT vào results.jsonl và flush
     end
     C->>O: Ghi summary.json
@@ -150,10 +160,10 @@ flowchart TD
     Detect --> IsHTML{"Loại detect hoặc MIME HTTP chứa html?"}
     IsHTML -->|"Có"| Password{"HTML có ô nhập password?"}
     Password -->|"Có"| Login["Bỏ: LOGIN_REQUIRED"]
-    Password -->|"Không"| DOM["Jsoup bỏ menu, script, form...<br/>Chọn vùng main và lấy title/text"]
+    Password -->|"Không"| DOM["Jsoup bỏ menu, script, form...<br/>Chọn vùng main và lấy title/text/link/ảnh"]
     DOM --> CleanHTML["Chuẩn hóa NFC và khoảng trắng"]
     CleanHTML --> Rule{"Text từ 120 ký tự,<br/>text link dưới 55%,<br/>title không báo lỗi mềm?"}
-    Rule -->|"Có"| Keep["Trả keep=true cùng title/text/type"]
+    Rule -->|"Có"| Keep["Trả keep=true cùng title/text/type/links"]
     Rule -->|"Không"| DropHTML["Bỏ: SHORT_OR_LINK_LIST,<br/>EMPTY_OR_JS_REQUIRED hoặc SOFT_ERROR"]
     IsHTML -->|"Không"| Supported{"Loại tài liệu trong allowlist?"}
     Supported -->|"Không"| Unsupported["Bỏ: UNSUPPORTED_TYPE"]
@@ -174,7 +184,7 @@ flowchart LR
         Seen["seenUrls và seenHashes<br/>Chống trùng trong batch"]
         Cache["Robots cache và thời điểm request"]
         Fetched["Fetched<br/>URL cuối, status, MIME, bytes"]
-        Extracted["Extracted<br/>title, text, type, keep, reason"]
+        Extracted["Extracted<br/>title, text, type, links, keep, reason"]
         Fetched --> Extracted
     end
     Extracted -->|"Đạt quy tắc và chưa trùng text"| Document["Document"]
@@ -183,7 +193,7 @@ flowchart LR
     Inputs -.->|"URL gốc"| Result
     Seen -.->|"Quyết định trùng"| Result
     subgraph Disk["Ổ đĩa — còn sau khi chương trình thoát"]
-        Docs["documents.jsonl<br/>Chỉ Document được giữ"]
+        Docs["documents.json + JSONL<br/>Chỉ Document được giữ"]
         Results["results.jsonl<br/>Mọi URL đã xử lý"]
         Summary["summary.json<br/>Bộ đếm cuối batch"]
     end

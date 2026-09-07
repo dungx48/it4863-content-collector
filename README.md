@@ -1,104 +1,160 @@
 # IT4863 — Công cụ thu thập nội dung HUST
 
-Project tập trung vào đề bài:
+Project thực hiện đúng phần **phát triển mã nguồn hỗ trợ thu thập**:
 
-**URL → kiểm tra khả dụng → tải về → phân loại giữ/bỏ → bóc tách nội dung tìm kiếm.**
+> Link bài viết → tải dữ liệu → bóc tách tiêu đề, nội dung văn bản, liên kết và ảnh đi ra.
 
-Dùng danh sách `N06_Ctrl+F` của bài trước. Chương trình Java dòng lệnh xử lý từng URL và xuất văn bản/báo cáo ra file, không cần database hoặc server.
+Mỗi liên kết/ảnh đi ra gồm URL HTTP(S) đầy đủ và văn bản mô tả. Project chưa triển khai công cụ tìm kiếm, Lucene, database hoặc crawl đệ quy.
 
-## Đọc lại project khi chuyển máy
+## Chức năng
 
-1. Đọc [context dự án và hướng dẫn máy mới](docs/project-context.md) để biết hiện trạng, file cần mang theo và cách chạy.
-2. Xem [sơ đồ thiết kế](docs/design-diagrams.md), rồi đọc [thiết kế chi tiết](docs/architecture.md) để hiểu từng module, luồng xử lý, dữ liệu và giới hạn thực tế.
-3. Xem [summary mẫu](output/demo-n06/summary.json) và [kết quả từng URL](output/demo-n06/results.jsonl) mà không cần chạy mạng.
-4. Xem [phạm vi kiểm thử](docs/validation.md) trước khi sửa code.
+- Nhận một URL HUST trên giao diện hoặc CLI.
+- Gợi ý URL từ whitelist `N06_Ctrl+F` gồm 9.516 URL duy nhất.
+- Import file TXT trong trình duyệt, lọc URL HUST và chọn một URL để demo.
+- Chạy batch nhiều URL bằng CLI.
+- Tải có kiểm tra domain, địa chỉ IP, robots.txt, redirect và giới hạn dung lượng.
+- Bóc tách HTML bằng Jsoup; PDF/Office/ODF/RTF bằng Apache Tika.
+- Lấy tiêu đề, văn bản, thẻ liên kết và nguồn ảnh trong vùng bài viết.
+- Chuẩn hóa Unicode tiếng Việt và loại nội dung trùng bằng SHA-256 của text.
+- Xuất JSON dễ đọc, JSONL theo dòng và báo cáo tổng hợp.
 
-Tài liệu đối chiếu mã nguồn ngày 05/09/2026. Danh sách N06 đầy đủ chưa có trong Git; repo có mẫu 6 URL tại `output/demo-input.txt`.
+## Yêu cầu môi trường
 
-## Stack giữ lại
+- JDK 21 trở lên.
+- Maven 3.9 trở lên.
+- Có mạng khi Maven cần tải dependency và khi thu thập website.
 
-| Thành phần | Mục đích |
-|---|---|
-| Java 21 + Maven | Chạy và đóng gói chương trình |
-| JDK HttpClient | Kiểm tra HTTP, tải tài nguyên, xử lý redirect |
-| Jsoup | Đọc HTML, lấy tiêu đề và nội dung chính |
-| Apache Tika | Nhận dạng và đọc PDF/DOCX/XLSX/PPTX và tài liệu khác |
-| crawler-commons | Đọc robots.txt |
-| Jackson | Xuất JSON/JSONL |
+Kiểm tra môi trường:
 
-Spring Boot, REST API, PostgreSQL/Flyway, Lucene, Angular, Docker và Playwright không còn trong project đang build. Ranking, highlight, phân trang và crawl đệ quy được gác lại. Text tiếng Việt được giữ nguyên dấu, chuẩn hóa Unicode để dùng cho bài tìm kiếm sau.
+```powershell
+java -version
+mvn -version
+```
 
-Tài liệu trước đây có nhắc phần web/search cũ tại `archive/previous-full-stack/`, nhưng checkout hiện tại không có thư mục này và `.gitignore` bỏ qua `archive/`. Clone repo trên máy mới sẽ không khôi phục phần mã cũ đó; nếu còn bản lưu riêng trên máy khác thì cần chuyển riêng.
+## Build
 
-## Build và chạy
+Chạy tại thư mục có `pom.xml`:
 
-Cần JDK 21 trở lên, Maven 3.9+:
-
-```sh
+```powershell
 mvn clean verify
-java -jar target/collector.jar --help
 ```
 
-Xử lý một URL:
+Kết quả là JAR kèm dependency tại `target/collector.jar`.
 
-```sh
-java -jar target/collector.jar --url https://hust.edu.vn/ --output output/single
+## Chạy giao diện demo
+
+```powershell
+java -jar target/collector.jar --serve 8080
 ```
 
-Trang chủ có thể bị loại vì không phải trang nội dung; nên dùng URL bài viết để kiểm tra bóc tách.
+Mở http://localhost:8080 và dùng một trong ba cách:
 
-Đặt file nhóm vào thư mục làm việc và thử 100 dòng URL đầu:
+1. Dán trực tiếp một link bài viết HUST.
+2. Gõ tên miền/đường dẫn rồi chọn gợi ý từ whitelist.
+3. Bấm **Import danh sách .txt**, lọc và chọn một URL trong file.
 
-```sh
-java -jar target/collector.jar --input N06_Ctrl+F --limit 100 --output output/sample
+Import TXT chỉ tạo danh sách để chọn từng URL trên giao diện. Muốn xử lý toàn bộ file, dùng chế độ CLI batch. File import tối đa 10 MiB, được đọc ngay trong trình duyệt và không gửi lên server. Dừng server bằng `Ctrl+C`.
+
+Có thể mở http://localhost:8080/?demo=1 để chạy URL mẫu tự động.
+
+## Chạy CLI
+
+Một URL:
+
+```powershell
+java -jar target/collector.jar --url https://soict.hust.edu.vn/bai-viet.html --output output/single-01
 ```
 
-Sau khi đánh giá mẫu, có thể xử lý toàn danh sách:
+Một file TXT, mỗi dòng có một URL và có thể có dấu phẩy cuối dòng:
 
-```sh
-java -jar target/collector.jar --input N06_Ctrl+F --limit 50000 --output output/full
+```powershell
+java -jar target/collector.jar --input input.txt --limit 100 --output output/batch-01
 ```
 
-Mặc định limit 100, tối đa 50.000. Giới hạn tính theo dòng URL, gồm dòng lỗi/trùng; phần giới thiệu không tính. Công cụ xử lý dấu phẩy cuối dòng của file nhóm và không mở rộng sang link mới.
+Chạy trực tiếp whitelist đã đóng gói trong source:
 
-Thư mục output phải chưa tồn tại để tránh ghi đè. Nếu không truyền, tự tạo `output/run-<thời điểm>`. Mỗi lần chạy độc lập, chưa có resume.
+```powershell
+java -jar target/collector.jar --input "src/main/resources/N06_Ctrl+F.txt" --limit 100 --output output/n06-01
+```
+
+Các option:
+
+| Option | Ý nghĩa |
+|---|---|
+| `--serve [port]` | Mở giao diện local; mặc định 8080 |
+| `--url <URL>` | Xử lý một URL; không dùng cùng `--input` |
+| `--input <file>` | Đọc danh sách URL UTF-8 |
+| `--limit <n>` | Số dòng URL tối đa; mặc định 100, tối đa 50.000 |
+| `--output <dir>` | Thư mục kết quả mới |
+| `--help` | In hướng dẫn CLI |
+
+Thư mục output phải chưa tồn tại. Công cụ chỉ xử lý URL được cung cấp, không tự crawl các link tìm thấy.
 
 ## Đầu ra
 
 ```text
-output/sample/
-  documents.jsonl   # Một nội dung được giữ trên mỗi dòng
-  results.jsonl     # Kết quả từng URL, kể cả lỗi/bị bỏ
-  summary.json      # Số đã xử lý, giữ, bỏ, trùng, lỗi, còn lại
+output/batch-01/
+  documents.json    # Mảng JSON dễ đọc của các tài liệu được giữ
+  documents.jsonl   # Mỗi dòng là một tài liệu được giữ
+  results.jsonl     # Kết quả của mọi URL đã xử lý
+  summary.json      # Bộ đếm cuối batch
 ```
 
-Documents chứa URL, title, text, contentType, contentHash và fetchedAt.
-Results chứa URL gốc/chuẩn hóa/cuối sau redirect, mã HTTP nếu có, status, reason, loại nội dung và hash nếu có.
+Một phần tử trong `documents.json`:
+
+```json
+{
+  "url": "https://soict.hust.edu.vn/bai-viet.html",
+  "title": "Tiêu đề bài viết",
+  "text": "Nội dung văn bản đã làm sạch...",
+  "links": [
+    {"url": "https://soict.hust.edu.vn/tai-lieu.pdf", "text": "Tải tài liệu"},
+    {"url": "https://soict.hust.edu.vn/images/anh.jpg", "text": "Ảnh hoạt động"}
+  ],
+  "contentType": "text/html",
+  "contentHash": "...",
+  "fetchedAt": "2026-09-08T00:00:00Z"
+}
+```
 
 | Status | Ý nghĩa |
 |---|---|
-| KEPT | Giữ và xuất nội dung |
-| SKIPPED | Bỏ theo quy tắc: login, ngoài domain, danh mục, định dạng chưa hỗ trợ… |
-| DUPLICATE | URL hoặc text trùng trong lần chạy |
-| FAILED | Lỗi HTTP, tải hoặc bóc tách; xem reason |
+| `KEPT` | Nội dung đạt quy tắc và được xuất |
+| `SKIPPED` | Bị policy hoặc quy tắc nội dung loại |
+| `DUPLICATE` | Trùng URL chuẩn hóa hoặc trùng text |
+| `FAILED` | Lỗi HTTP, tải, parser hoặc filesystem |
 
-Kết quả flush sau mỗi URL. Nếu bị ngắt, các dòng đã ghi vẫn còn; summary chỉ có khi batch kết thúc. Chưa lưu file tải gốc, chỉ lưu text/metadata. URL trùng được bỏ trước tải; text trùng được phát hiện sau tải/bóc tách.
+JSONL được flush sau mỗi URL. Nếu batch bị ngắt, các dòng đã ghi vẫn có thể đọc; `summary.json` chỉ xuất khi batch kết thúc bình thường.
 
-## Cấu trúc đang sử dụng
+## Cấu trúc project
 
 ```text
-pom.xml
 src/main/java/vn/edu/hust/collector/
-  Collector.java                 # CLI, đọc danh sách, điều phối, xuất kết quả
-  crawl/UrlPolicy.java           # Chuẩn hóa/kiểm tra URL
-  crawl/Fetcher.java             # HTTP, robots, redirect, giới hạn tải
-  extract/ContentExtractor.java  # Bóc tách và quyết định giữ/bỏ
-src/test/java/                   # Test URL, HTTP, extractor, batch output
-docs/architecture.md
-docs/validation.md
-docs/project-context.md         # Context dự án và hướng dẫn chuyển máy
+  Collector.java                 # CLI, batch, dedup và output
+  DemoServer.java                # Web local, API extract và whitelist
+  crawl/UrlPolicy.java           # Chuẩn hóa, domain và địa chỉ IP
+  crawl/Fetcher.java             # robots.txt, HTTP, redirect và dung lượng
+  extract/ContentExtractor.java  # Title, text, link, ảnh và giữ/bỏ
+src/main/resources/
+  N06_Ctrl+F.txt                 # Whitelist dùng cho gợi ý
+  web/                           # HTML, CSS và JavaScript của demo
+src/test/java/                   # 13 test tự động
+docs/                            # Tài liệu kỹ thuật và trình diễn
 ```
 
-Chỉ xử lý URL công khai thuộc hust.edu.vn/subdomain; bỏ login/SSO. Tối đa 20 MiB mỗi tài nguyên, 5 redirect, độ trễ request cùng host 1 giây. Lỗi I/O và HTTP 429/5xx được thử tối đa 3 lượt tổng cộng (1 lượt đầu + 2 lượt thử lại).
+## Giới hạn hiện tại
 
-Quy tắc HTML cần đánh giá trên mẫu nhóm, có thể bỏ nhầm thông báo ngắn hoặc giữ nhầm danh mục. Chưa có JavaScript renderer hoặc OCR. Xem [kiến trúc và giới hạn](docs/architecture.md), [kiểm thử](docs/validation.md).
+- Chỉ chấp nhận `hust.edu.vn` và subdomain, bỏ URL đăng nhập/SSO.
+- Tối đa 20 MiB mỗi tài nguyên, năm redirect và ba lần thử tải.
+- Xử lý tuần tự; chưa có resume hoặc lưu raw HTML/tài liệu gốc.
+- Chưa render JavaScript và chưa cấu hình OCR cho PDF scan.
+- Hyperlink bên trong PDF/Office chưa được đưa vào `links`.
+- Quy tắc chất lượng HTML có thể bỏ nhầm bài quá ngắn hoặc giữ nhầm trang danh mục.
+
+## Tài liệu
+
+- [Hướng dẫn trình diễn](docs/demo.md)
+- [Thiết kế chi tiết](docs/architecture.md)
+- [Sơ đồ thiết kế](docs/design-diagrams.md)
+- [Thiết lập và chuyển máy](docs/project-context.md)
+- [Phạm vi kiểm thử](docs/validation.md)

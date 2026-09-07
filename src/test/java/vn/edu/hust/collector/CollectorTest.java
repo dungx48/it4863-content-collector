@@ -29,6 +29,8 @@ class CollectorTest {
         var mapper=new ObjectMapper();
         var documents=Files.readAllLines(output.resolve("documents.jsonl"));
         assertThat(documents).hasSize(1);
+        assertThat(mapper.readTree(documents.getFirst()).get("links").isArray()).isTrue();
+        assertThat(mapper.readTree(output.resolve("documents.json").toFile()).get(0)).isEqualTo(mapper.readTree(documents.getFirst()));
         assertThat(mapper.readTree(documents.getFirst()).get("text").asText()).contains("học bổng");
         assertThat(Files.readAllLines(output.resolve("results.jsonl"))).hasSize(6);
         assertThat(mapper.readTree(output.resolve("summary.json").toFile()).get("failed").asInt()).isEqualTo(1);
