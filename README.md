@@ -6,6 +6,15 @@ Project tập trung vào đề bài:
 
 Dùng danh sách `N06_Ctrl+F` của bài trước. Chương trình Java dòng lệnh xử lý từng URL và xuất văn bản/báo cáo ra file, không cần database hoặc server.
 
+## Đọc lại project khi chuyển máy
+
+1. Đọc [context dự án và hướng dẫn máy mới](docs/project-context.md) để biết hiện trạng, file cần mang theo và cách chạy.
+2. Xem [sơ đồ thiết kế](docs/design-diagrams.md), rồi đọc [thiết kế chi tiết](docs/architecture.md) để hiểu từng module, luồng xử lý, dữ liệu và giới hạn thực tế.
+3. Xem [summary mẫu](output/demo-n06/summary.json) và [kết quả từng URL](output/demo-n06/results.jsonl) mà không cần chạy mạng.
+4. Xem [phạm vi kiểm thử](docs/validation.md) trước khi sửa code.
+
+Tài liệu đối chiếu mã nguồn ngày 05/09/2026. Danh sách N06 đầy đủ chưa có trong Git; repo có mẫu 6 URL tại `output/demo-input.txt`.
+
 ## Stack giữ lại
 
 | Thành phần | Mục đích |
@@ -19,7 +28,7 @@ Dùng danh sách `N06_Ctrl+F` của bài trước. Chương trình Java dòng l�
 
 Spring Boot, REST API, PostgreSQL/Flyway, Lucene, Angular, Docker và Playwright không còn trong project đang build. Ranking, highlight, phân trang và crawl đệ quy được gác lại. Text tiếng Việt được giữ nguyên dấu, chuẩn hóa Unicode để dùng cho bài tìm kiếm sau.
 
-Phần web/search cũ nằm ở `archive/previous-full-stack/` để có thể lấy lại; Maven tại thư mục gốc không build phần đó. Đây là lưu trữ mã cũ, không phải hệ thống đang được duy trì.
+Tài liệu trước đây có nhắc phần web/search cũ tại `archive/previous-full-stack/`, nhưng checkout hiện tại không có thư mục này và `.gitignore` bỏ qua `archive/`. Clone repo trên máy mới sẽ không khôi phục phần mã cũ đó; nếu còn bản lưu riêng trên máy khác thì cần chuyển riêng.
 
 ## Build và chạy
 
@@ -87,9 +96,9 @@ src/main/java/vn/edu/hust/collector/
 src/test/java/                   # Test URL, HTTP, extractor, batch output
 docs/architecture.md
 docs/validation.md
-archive/previous-full-stack/     # Phần cũ, không tham gia build
+docs/project-context.md         # Context dự án và hướng dẫn chuyển máy
 ```
 
-Chỉ xử lý URL công khai thuộc hust.edu.vn/subdomain; bỏ login/SSO. Tối đa 20 MiB mỗi tài nguyên, 5 redirect, độ trễ request cùng host 1 giây. Retry lỗi I/O và HTTP 429/5xx tối đa 3 lần.
+Chỉ xử lý URL công khai thuộc hust.edu.vn/subdomain; bỏ login/SSO. Tối đa 20 MiB mỗi tài nguyên, 5 redirect, độ trễ request cùng host 1 giây. Lỗi I/O và HTTP 429/5xx được thử tối đa 3 lượt tổng cộng (1 lượt đầu + 2 lượt thử lại).
 
 Quy tắc HTML cần đánh giá trên mẫu nhóm, có thể bỏ nhầm thông báo ngắn hoặc giữ nhầm danh mục. Chưa có JavaScript renderer hoặc OCR. Xem [kiến trúc và giới hạn](docs/architecture.md), [kiểm thử](docs/validation.md).
