@@ -1,0 +1,12 @@
+{
+  "name": "collector-demo",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Optional demo client for the standalone collector backend",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  }
+}

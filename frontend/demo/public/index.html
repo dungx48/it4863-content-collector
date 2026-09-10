@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Trình diễn bóc tách nội dung bài viết HUST">
+  <title>Ctrl+F — Thu thập nội dung HUST</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <!-- Thanh nhận diện của bản trình diễn. -->
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Trang chủ">
+      <span class="brand-mark">C<span>+</span>F</span>
+      <span><strong>Ctrl+F</strong><small>Nhóm N06 · IT4863</small></span>
+    </a>
+    <nav aria-label="Màn hình demo"><a href="/" aria-current="page">Thu thập</a> · <a href="/search">Tìm kiếm TF-IDF →</a></nav>
+  </header>
+
+  <main>
+    <!-- Nhập trực tiếp, chọn whitelist hoặc import TXT. -->
+    <section class="hero">
+      <p class="eyebrow">TRÌNH DIỄN THU THẬP DỮ LIỆU</p>
+      <h1>Từ một đường link<br><em>đến nội dung sạch.</em></h1>
+      <p class="lead">Nhập link bài viết thuộc <strong>hust.edu.vn</strong>. Hệ thống tải trang và bóc tách tiêu đề, nội dung văn bản cùng các liên kết và ảnh đi ra.</p>
+
+      <form id="extract-form" class="url-form">
+        <label for="url">Link bài viết</label>
+        <div class="input-row">
+          <span class="link-icon" aria-hidden="true">↗</span>
+          <input id="url" name="url" type="url" required autocomplete="url"
+                 list="whitelist-suggestions"
+                 placeholder="Gõ tên miền hoặc đường dẫn để xem gợi ý">
+          <datalist id="whitelist-suggestions"></datalist>
+          <button id="submit" type="submit">
+            <span class="button-label">Bóc tách</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+        </div>
+        <div class="input-tools">
+          <button class="example" id="example" type="button">Dùng link bài viết mẫu</button>
+          <label class="file-action" for="txt-import">Import danh sách .txt</label>
+          <input id="txt-import" type="file" accept=".txt,text/plain" hidden>
+          <span id="whitelist-status" class="source-status">Gõ để tìm trong whitelist N06_Ctrl+F</span>
+        </div>
+
+        <section id="import-panel" class="import-panel" hidden>
+          <div class="import-heading">
+            <div><strong id="import-title">Danh sách đã import</strong><span id="import-count"></span></div>
+            <button id="clear-import" type="button">Bỏ danh sách</button>
+          </div>
+          <label for="import-filter">Tìm trong file</label>
+          <input id="import-filter" type="search" placeholder="Lọc theo tên miền hoặc đường dẫn">
+          <select id="imported-urls" size="6" aria-label="Các URL đã import"></select>
+          <p id="import-note" class="import-note"></p>
+        </section>
+      </form>
+    </section>
+
+    <section id="status" class="status" hidden aria-live="polite"></section>
+
+    <!-- Ba nhóm dữ liệu đúng theo yêu cầu bài tập. -->
+    <section id="result" class="result" hidden>
+      <div class="result-heading">
+        <div>
+          <p class="eyebrow">DỮ LIỆU BÓC TÁCH ĐƯỢC</p>
+          <h2>Kết quả thu thập</h2>
+        </div>
+        <div><button id="download-json" class="secondary" type="button">Tải JSON để tìm kiếm</button>
+        <button id="copy-json" class="secondary" type="button">Sao chép JSON</button></div>
+      </div>
+
+      <div class="metrics">
+        <div><span>HTTP</span><strong id="http-status">—</strong></div>
+        <div><span>Định dạng</span><strong id="content-type">—</strong></div>
+        <div><span>Số ký tự</span><strong id="char-count">—</strong></div>
+        <div><span>Liên kết</span><strong id="link-count">—</strong></div>
+        <div><span>Thời gian</span><strong id="elapsed">—</strong></div>
+      </div>
+
+      <article class="card title-card">
+        <div class="card-number">01</div>
+        <div class="card-body">
+          <h3>Tiêu đề</h3>
+          <p id="article-title" class="extracted-title"></p>
+          <a id="final-url" class="final-url" target="_blank" rel="noopener noreferrer"></a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-number">02</div>
+        <div class="card-body">
+          <div class="card-title-row">
+            <h3>Nội dung văn bản</h3>
+            <button id="copy-text" class="text-action" type="button">Sao chép</button>
+          </div>
+          <p id="article-text" class="article-text"></p>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-number">03</div>
+        <div class="card-body">
+          <h3>Các liên kết đi ra</h3>
+          <p class="hint">URL đầy đủ và văn bản mô tả của liên kết và ảnh trong vùng nội dung bài viết.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Văn bản mô tả</th><th>URL đầy đủ</th></tr></thead>
+              <tbody id="links"></tbody>
+            </table>
+            <p id="no-links" class="empty" hidden>Không có liên kết hoặc ảnh đi ra trong vùng bài viết.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer><span>Đại học Bách khoa Hà Nội</span><span>Java 21 · Jsoup · Apache Tika</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

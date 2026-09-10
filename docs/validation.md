@@ -1,75 +1,54 @@
 # Kiểm thử và phạm vi xác nhận
 
-Cập nhật: **08/09/2026**.
+Cập nhật theo refactor một backend ngày 10/09/2026.
 
-## Kết quả gần nhất
-
-Môi trường: Windows, JDK 25 chạy mã biên dịch với `release 21`, Maven 3.9.9.
+## Lệnh kiểm thử
 
 ```powershell
-node --check src/main/resources/web/app.js
-mvn -Dmaven.repo.local=.cache/m2 -B -ntp clean verify
+mvn verify
+node --test frontend/demo/server.test.mjs
+node --check frontend/demo/public/app.js
 ```
 
-Kết quả:
+Windows sandbox có thể cần temp nằm trong workspace; xem [project-context.md](project-context.md).
 
-- JavaScript không có lỗi cú pháp.
-- Maven build thành công và tạo `target/collector.jar`.
-- **13 test đạt, 0 thất bại, 0 lỗi, 0 bỏ qua.**
-- JAR chứa `DemoServer.class`, `web/app.js` và `N06_Ctrl+F.txt`.
+## Phạm vi
 
-## Các nhóm test
-
-| Nhóm | Số test | Hành vi được kiểm tra |
+| Nhóm | Số test | Hành vi |
 |---|---:|---|
-| `UrlPolicyTest` | 2 | Chuẩn hóa URL, bỏ tracking/fragment, domain boundary, protocol, credentials và login ASSO |
-| `FetcherTest` | 3 | HTTP thành công, robots disallow, redirect ngoài origin và giới hạn Content-Length |
-| `ContentExtractorTest` | 4 | HTML bỏ navigation, login form, DOCX, link/ảnh tuyệt đối, mô tả và lazy-load |
-| `CollectorTest` | 2 | Import N06, dedup URL/text, JSON/JSONL, summary, không ghi đè, limit và lỗi downloader |
-| `DemoServerTest` | 2 | Web tĩnh, API whitelist, API extract, link ảnh, URL ngoài HUST và login |
+| UrlPolicyTest | 2 | Normalize, tracking/fragment, domain, protocol, credentials, login |
+| FetcherTest | 3 | HTTP, robots disallow, redirect, Content-Length |
+| ContentExtractorTest | 4 | HTML, login form, DOCX, link/ảnh và lazy-load |
+| BatchServiceTest | 2 | Input N06, dedup URL/text, output, summary, không ghi đè, limit/lỗi tải |
+| ApplicationTest | 5 | Spring context, Actuator health, API/whitelist, validation, lỗi và HTTP 429 |
+| SearchServiceTest | 4 | Công thức TF-IDF, ranking, persistence, thay thế, validation và JSON collector |
+| SearchApiTest | 1 | API index/search, validation, giới hạn body cố định và chunked |
+| frontend/demo/server.test.mjs | 3 | Proxy giữ payload/status, static, giới hạn body riêng cho index/extract, backend dừng |
 
-Test HTTP dùng server loopback và fixture, không crawl HUST. `CollectorTest` tiêm downloader giả để kết quả ổn định.
+21 test Java và 3 test Node đã đạt. Test dùng fixture/loopback, không crawl HUST.
+Frontend còn được kiểm tra cú pháp JavaScript.
 
-## Kiểm tra dữ liệu thật
+Smoke test tìm kiếm trên Edge headless đã đạt: chọn mẫu, tạo chỉ mục, thứ hạng/giải thích điểm,
+upload JSON collector, truy vấn không có kết quả, chỉ mục tồn tại sau khi backend khởi động lại,
+điều hướng hai màn hình và bố cục mobile 390px. Hướng dẫn: [search.md](search.md).
 
-Whitelist lấy từ `bangoc/hust.edu.vn-2026`, đóng gói tại `src/main/resources/N06_Ctrl+F.txt`:
+Smoke test bản JAR đã đạt: chạy backend và demo ở hai tiến trình/port riêng,
+health probe trả thành công, proxy lấy whitelist và giữ lỗi policy HTTP 400.
+Sau khi dừng cả hai tiến trình, CLI vẫn chạy batch và xuất JSON/JSONL đúng.
+`docker compose config --quiet` đã đạt; chưa build hoặc chạy container.
 
-- 9.523 dòng.
-- 9.516 URL duy nhất.
-- 0 URL ngoài `hust.edu.vn` hoặc subdomain.
+Spring Boot JAR phải chứa `Application.class`, controller/service/repository/model và whitelist,
+không chứa `web/`, HTML/CSS/JS frontend hoặc `DemoServer.class`.
+Maven root chỉ build module backend; frontend test chạy bằng Node riêng.
 
-Đã chạy JAR với bài viết UNESCO trên SoICT. File local `output/demo-image-links/documents.json` chứa:
+## Giới hạn xác minh
 
-- 1 tài liệu được giữ.
-- 6 URL đi ra.
-- 5 URL ảnh.
+- Không chạy toàn bộ whitelist 9.516 URL hoặc đánh giá precision/recall heuristic.
+- Chưa có test trình duyệt tự động cho mọi thao tác import/copy/render.
+- Retry/backoff chưa có fixture kiểm tra thời gian đầy đủ.
+- Chưa kiểm tra mọi loại tài liệu Tika, trạng thái robots và DNS thay đổi.
+- Compose/Docker cần xác minh riêng theo daemon và image có trên máy;
+  cú pháp Compose hợp lệ không đồng nghĩa image đã build/chạy thành công.
+- Chưa triển khai auth, database, durable queue, OCR hoặc resume batch.
 
-Thư mục này bị `.gitignore` bỏ qua; output lịch sử đã commit nằm tại `output/demo-n06/` và phản ánh phiên bản cũ hơn.
-
-## Điều chưa được test đầy đủ
-
-- CLI parser chưa có test riêng cho mọi tổ hợp option sai.
-- Retry/backoff chưa có fixture xác nhận thời gian và đủ ba lần thử.
-- Chưa kiểm tra mọi trạng thái robots.txt, redirect và DNS thay đổi.
-- Chưa có mẫu thực tế cho XLSX, PPTX, ODF và RTF.
-- Chưa kiểm tra OCR, vì project chưa cấu hình OCR.
-- Chưa đánh giá precision/recall của heuristic trên toàn whitelist.
-- Frontend mới kiểm tra cú pháp và API; chưa có bộ test trình duyệt tự động.
-- Chưa chạy toàn bộ 9.516 URL, vì việc này tốn thời gian và phụ thuộc trạng thái website.
-
-## Cách kiểm tra trước khi nộp
-
-```powershell
-mvn clean verify
-java -jar target/collector.jar --serve 8080
-```
-
-Trên giao diện, kiểm tra lần lượt:
-
-1. Gõ `soict` và chọn một gợi ý whitelist.
-2. Import một TXT có URL hợp lệ, URL trùng và URL ngoài HUST.
-3. Chọn URL đã import rồi bấm **Bóc tách**.
-4. Kiểm tra tiêu đề, văn bản, liên kết và URL ảnh.
-5. Sao chép JSON và kiểm tra các trường `title`, `text`, `links`.
-
-Dừng server bằng `Ctrl+C` sau khi kiểm tra.
+Dữ liệu `output/demo-n06/` là mẫu lịch sử đã có, không phải kết quả crawl mới của lần refactor.

@@ -1,0 +1,30 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: "8080"
+      SEARCH_INDEX_PATH: /app/data/lucene-index
+    volumes:
+      - collector-data:/app/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    init: true
+    stop_grace_period: 10s
+
+  demo:
+    profiles: [demo]
+    build: ./frontend/demo
+    environment:
+      BACKEND_URL: http://backend:8080
+      DEMO_HOST: 0.0.0.0
+      DEMO_PORT: "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    init: true
+
+volumes:
+  collector-data:

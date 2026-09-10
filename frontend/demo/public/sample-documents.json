@@ -1,0 +1,32 @@
+[
+  {
+    "id": "demo-1",
+    "title": "Học bổng sinh viên",
+    "text": "Học bổng học bổng học bổng dành cho sinh viên có thành tích học tập xuất sắc. Hồ sơ học bổng gồm bảng điểm và đơn đăng ký."
+  },
+  {
+    "id": "demo-2",
+    "title": "Hoạt động sinh viên",
+    "text": "Sinh viên tham gia câu lạc bộ, hoạt động cộng đồng, thể thao và học bổng. Nhà trường hỗ trợ sinh viên phát triển kỹ năng làm việc nhóm."
+  },
+  {
+    "id": "demo-3",
+    "title": "Lucene và chỉ mục",
+    "text": "Lucene tạo chỉ mục đảo cho tập văn bản. Lucene xử lý truy vấn và trả kết quả theo điểm TF-IDF. Lucene lưu tần suất từ trong từng văn bản."
+  },
+  {
+    "id": "demo-4",
+    "title": "Tìm kiếm thông tin",
+    "text": "Môn tìm kiếm thông tin giới thiệu mô hình không gian vector, chỉ mục đảo và xếp hạng TF-IDF. Bài thực hành sử dụng Lucene."
+  },
+  {
+    "id": "demo-5",
+    "title": "Thực tập doanh nghiệp",
+    "text": "Sinh viên đăng ký thực tập doanh nghiệp để phát triển kỹ năng lập trình. Báo cáo thực tập cần mô tả công việc, kết quả và đánh giá của đơn vị."
+  },
+  {
+    "id": "demo-6",
+    "title": "Thư viện và tài liệu",
+    "text": "Thư viện cung cấp giáo trình, sách điện tử và tài liệu nghiên cứu. Người đọc có thể tra cứu tài liệu theo tiêu đề và nội dung."
+  }
+]

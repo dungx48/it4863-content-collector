@@ -6,10 +6,16 @@ Mục tiêu demo: đưa vào một link bài viết và hiển thị tiêu đề
 
 ```powershell
 mvn clean verify
-java -jar target/collector.jar --serve 8080
+java -jar backend/target/collector.jar --serve 8080
 ```
 
-Mở http://localhost:8080. Server chỉ chạy trên máy local và dừng bằng `Ctrl+C`.
+Mở terminal thứ hai và chạy frontend riêng:
+
+```powershell
+node frontend/demo/server.mjs
+```
+
+Mở http://localhost:3000. Backend API ở port 8080. Dừng từng tiến trình bằng `Ctrl+C`.
 
 ## 2. Kịch bản trình diễn đề xuất
 
@@ -72,7 +78,7 @@ Quy tắc liên kết/ảnh:
 ## 4. Chạy cùng URL bằng CLI
 
 ```powershell
-java -jar target/collector.jar `
+java -jar backend/target/collector.jar `
   --url https://soict.hust.edu.vn/bai-giang-dai-chung-cua-unesco-dao-duc-trong-tri-tue-nhan-tao.html `
   --output output/demo-article-01
 ```

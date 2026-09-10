@@ -2,8 +2,10 @@
 .cache/
 .idea/
 **/target/
+**/node_modules/
 archive/
 output/*
 !output/demo-input.txt
 !output/demo-n06/
 *.log
+**/data/lucene-index/

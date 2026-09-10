@@ -6,6 +6,19 @@ Project thực hiện đúng phần **phát triển mã nguồn hỗ trợ thu t
 
 Mỗi liên kết/ảnh đi ra gồm URL HTTP(S) đầy đủ và văn bản mô tả. Project chưa triển khai công cụ tìm kiếm, Lucene, database hoặc crawl đệ quy.
 
+## Kiến trúc
+
+**Một backend duy nhất** trong `backend/`, chia controller, service, repository,
+model, dto và config. Download, parser, whitelist và batch đều chạy trong backend này.
+Frontend ở `frontend/demo/` chỉ là client trình diễn và chạy riêng trên port 3000.
+
+```text
+Frontend demo :3000 → HTTP → Backend :8080
+                              controller → service → repository
+                                            ↓
+                                      crawl / extract
+```
+
 ## Chức năng
 
 - Nhận một URL HUST trên giao diện hoặc CLI.
@@ -39,49 +52,91 @@ Chạy tại thư mục có `pom.xml`:
 mvn clean verify
 ```
 
-Kết quả là JAR kèm dependency tại `target/collector.jar`.
+Kết quả là JAR kèm dependency tại `backend/target/collector.jar`.
 
-## Chạy giao diện demo
+## Chạy backend và frontend demo
+
+Chạy cả hai bằng một lệnh tại repository root (sau khi build):
 
 ```powershell
-java -jar target/collector.jar --serve 8080
+.\start.cmd
 ```
 
-Mở http://localhost:8080 và dùng một trong ba cách:
+Launcher chờ backend sẵn sàng rồi mở frontend. Truy cập http://localhost:3000;
+nhấn `Ctrl+C` để dừng cả hai. Nếu một tiến trình lỗi, tiến trình còn lại cũng được dừng.
+Không cần Docker hoặc npm install. Khi sửa Java, chạy lại `mvn verify` trước khi khởi động.
+Trên macOS/Linux có thể dùng `node scripts/dev.mjs`.
 
-1. Dán trực tiếp một link bài viết HUST.
-2. Gõ tên miền/đường dẫn rồi chọn gợi ý từ whitelist.
-3. Bấm **Import danh sách .txt**, lọc và chọn một URL trong file.
+Hoặc chạy từng tiến trình riêng:
 
-Import TXT chỉ tạo danh sách để chọn từng URL trên giao diện. Muốn xử lý toàn bộ file, dùng chế độ CLI batch. File import tối đa 10 MiB, được đọc ngay trong trình duyệt và không gửi lên server. Dừng server bằng `Ctrl+C`.
+Terminal 1 — backend API độc lập:
 
-Có thể mở http://localhost:8080/?demo=1 để chạy URL mẫu tự động.
+```powershell
+java -jar backend/target/collector.jar --serve 8080
+```
+
+Terminal 2 — frontend demo (Node.js 22+, không cần npm install):
+
+```powershell
+node frontend/demo/server.mjs
+```
+
+Mở http://localhost:3000. API nằm tại http://127.0.0.1:8080; `/health` trả trạng thái.
+Frontend dùng proxy cùng origin tới backend, không cần CORS. Có thể chỉ chạy backend
+và gọi API bằng client bất kỳ. `--serve` không còn phục vụ giao diện từ JAR.
+
+Demo vẫn hỗ trợ URL trực tiếp, gợi ý whitelist và import TXT trong trình duyệt.
+Import không upload file hoặc tự chạy batch. URL mẫu tự động: http://localhost:3000/?demo=1.
+Dừng từng tiến trình bằng `Ctrl+C`.
+
+### Docker Compose
+
+```powershell
+docker compose up --build -d backend
+# Khi cần thêm frontend demo:
+docker compose --profile demo up --build -d
+```
+
+Frontend thuộc profile tùy chọn; backend luôn chạy độc lập.
+Các port chỉ publish trên loopback. Xem [Compose profiles](https://docs.docker.com/compose/how-tos/profiles/).
+
+### Cấu hình
+
+| Biến | Mặc định | Tiến trình |
+|---|---|---|
+| `SERVER_HOST` | `127.0.0.1` | Backend |
+| `SERVER_PORT` | `8080` | Backend; `--serve <port>` ghi đè |
+| `BACKEND_URL` | `http://127.0.0.1:8080` | Proxy của demo |
+| `DEMO_HOST` | `127.0.0.1` | Demo |
+| `DEMO_PORT` | `3000` | Demo |
+
+Hợp đồng endpoint: [docs/api.md](docs/api.md).
 
 ## Chạy CLI
 
 Một URL:
 
 ```powershell
-java -jar target/collector.jar --url https://soict.hust.edu.vn/bai-viet.html --output output/single-01
+java -jar backend/target/collector.jar --url https://soict.hust.edu.vn/bai-viet.html --output output/single-01
 ```
 
 Một file TXT, mỗi dòng có một URL và có thể có dấu phẩy cuối dòng:
 
 ```powershell
-java -jar target/collector.jar --input input.txt --limit 100 --output output/batch-01
+java -jar backend/target/collector.jar --input input.txt --limit 100 --output output/batch-01
 ```
 
 Chạy trực tiếp whitelist đã đóng gói trong source:
 
 ```powershell
-java -jar target/collector.jar --input "src/main/resources/N06_Ctrl+F.txt" --limit 100 --output output/n06-01
+java -jar backend/target/collector.jar --input "backend/src/main/resources/N06_Ctrl+F.txt" --limit 100 --output output/n06-01
 ```
 
 Các option:
 
 | Option | Ý nghĩa |
 |---|---|
-| `--serve [port]` | Mở giao diện local; mặc định 8080 |
+| `--serve [port]` | Mở backend API; mặc định 8080 |
 | `--url <URL>` | Xử lý một URL; không dùng cùng `--input` |
 | `--input <file>` | Đọc danh sách URL UTF-8 |
 | `--limit <n>` | Số dòng URL tối đa; mặc định 100, tối đa 50.000 |
@@ -129,18 +184,30 @@ JSONL được flush sau mỗi URL. Nếu batch bị ngắt, các dòng đã ghi
 ## Cấu trúc project
 
 ```text
-src/main/java/vn/edu/hust/collector/
-  Collector.java                 # CLI, batch, dedup và output
-  DemoServer.java                # Web local, API extract và whitelist
-  crawl/UrlPolicy.java           # Chuẩn hóa, domain và địa chỉ IP
-  crawl/Fetcher.java             # robots.txt, HTTP, redirect và dung lượng
-  extract/ContentExtractor.java  # Title, text, link, ảnh và giữ/bỏ
-src/main/resources/
-  N06_Ctrl+F.txt                 # Whitelist dùng cho gợi ý
-  web/                           # HTML, CSS và JavaScript của demo
-src/test/java/                   # 13 test tự động
-docs/                            # Tài liệu kỹ thuật và trình diễn
+backend/                     # Một ứng dụng Spring Boot, một JAR/container
+  pom.xml
+  src/main/java/vn/edu/hust/collector/
+    Application.java         # @SpringBootApplication + CLI entry point
+    controller/              # Spring MVC, validation, HTTP status
+    service/                 # Thu thập, retry, batch/dedup, whitelist
+    repository/              # URL nguồn + JSON/JSONL output
+    model/                   # Record dữ liệu nghiệp vụ
+    dto/                     # API response
+    config/                  # Spring beans và health probe
+    crawl/                   # URL/IP, robots, HTTP, redirect
+    extract/                 # Jsoup/Tika
+  src/main/resources/        # Whitelist, logging; không chứa frontend
+  src/test/java/
+frontend/demo/               # Giao diện độc lập, không dependency npm
+  public/                    # HTML/CSS/JS
+  server.mjs                 # Static server + API proxy
+compose.yaml                 # Backend + profile demo tùy chọn
+pom.xml                      # Maven aggregator chỉ chứa backend
+docs/                        # API, kiến trúc, chạy và kiểm thử
 ```
+
+Build từ root bằng `mvn clean verify`, hoặc build riêng bằng `mvn -f backend/pom.xml clean verify`.
+Chi tiết: [backend](backend/README.md), [frontend demo](frontend/demo/README.md).
 
 ## Giới hạn hiện tại
 
@@ -153,6 +220,7 @@ docs/                            # Tài liệu kỹ thuật và trình diễn
 
 ## Tài liệu
 
+- [Trình diễn tìm kiếm Lucene / TF-IDF](docs/search.md) — mở `/search` trên frontend demo.
 - [Hướng dẫn trình diễn](docs/demo.md)
 - [Thiết kế chi tiết](docs/architecture.md)
 - [Sơ đồ thiết kế](docs/design-diagrams.md)

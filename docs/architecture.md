@@ -1,92 +1,68 @@
-# Thiết kế chi tiết — IT4863 Content Collector
+# Kiến trúc backend collector
 
-Ngày đối chiếu mã nguồn: **08/09/2026**. Tài liệu mô tả triển khai trong `src/`, không phải đề xuất hệ thống tương lai. Hướng dẫn chạy trên máy mới: [project-context.md](project-context.md).
+Cập nhật theo refactor ngày 10/09/2026. Hệ thống có **một backend triển khai độc lập**.
+Các layer bên dưới là package trong cùng JVM, không phải các microservice riêng.
+Frontend demo là ứng dụng độc lập, có thể bỏ khỏi deployment.
 
-Xem trước [7 sơ đồ thiết kế có giải thích](design-diagrams.md) nếu muốn hình dung hệ thống trước khi đọc chi tiết.
+## 1. Phạm vi
 
-## 1. Mục tiêu và phạm vi
+URL HUST → tải có policy → bóc tách title/text/link/ảnh → trả API hoặc xuất batch JSON/JSONL.
+Tìm kiếm Lucene/TF-IDF nằm trong cùng backend, chi tiết tại [search.md](search.md).
+Chưa thêm database, message broker, authentication, OCR hoặc crawl đệ quy.
+Repository hiện truy cập filesystem/classpath; không tạo repository database giả.
 
-Project biến danh sách URL HUST có sẵn thành tập văn bản phục vụ bước tìm kiếm sau này. Mỗi URL được kiểm tra, tải, bóc tách, quyết định giữ/bỏ và ghi kết quả có lý do. Văn bản tiếng Việt giữ nguyên dấu.
-
-Đầu vào là một URL hoặc file UTF-8 theo dạng danh sách N06. Batch xuất JSON/JSONL ra ổ đĩa. Chế độ `--serve` mở giao diện và API trên localhost để trình diễn một URL; dừng bằng Ctrl+C.
-
-| Đang có | Chưa triển khai |
-|---|---|
-| Chuẩn hóa và chống trùng URL | Khám phá link/crawl đệ quy |
-| Kiểm tra domain, IP, robots.txt, redirect | Đăng nhập, quản lý phiên người dùng |
-| Bóc tách HTML và tài liệu trong allowlist | JavaScript renderer, pipeline OCR được cấu hình/kiểm chứng |
-| Lọc bằng quy tắc, hash text | Tìm kiếm, ranking, highlight, index Lucene |
-| JSON/JSONL, thống kê và giao diện demo local | Database, API triển khai từ xa, resume |
-
-README cũ nhắc bản full-stack lưu riêng, nhưng `archive/` bị Git bỏ qua và không có trong checkout đã kiểm tra. Build không phụ thuộc thư mục đó.
-
-## 2. Kiến trúc tổng thể
+## 2. Ranh giới triển khai
 
 ```mermaid
-flowchart TD
-    CLI[Collector.main] --> Mode{Chế độ}
-    Mode -->|url/input| Input[Đọc danh sách và limit]
-    Mode -->|serve| UI[HTML/CSS/JS trên localhost]
-    UI --> Suggest[GET /api/whitelist]
-    Suggest --> White[N06_Ctrl+F.txt trong classpath]
-    UI --> API[POST /api/extract]
-    Import[File TXT đọc trong trình duyệt] --> UI
-    API --> Policy
-    Input --> Batch[Collector.run: vòng lặp tuần tự]
-    Batch --> Policy[UrlPolicy: chuẩn hóa và kiểm tra]
-    Policy --> Seen{URL đã gặp?}
-    Seen -->|Có| Result[results.jsonl]
-    Seen -->|Chưa| Fetch[Fetcher: robots, GET, redirect]
-    Fetch --> Extract[ContentExtractor: Tika và Jsoup]
-    Extract --> Keep{Giữ nội dung?}
-    Keep -->|Không| Result
-    Keep -->|Có| Hash{SHA-256 text đã gặp?}
-    Hash -->|Có| Result
-    Hash -->|Chưa| Docs[documents.json + documents.jsonl]
-    Docs --> Result
-    Policy -->|Bị từ chối| Result
-    Fetch -->|Lỗi hoặc bị chặn| Result
-    Extract -->|Lỗi parser| Result
-    Result --> Next{Còn URL trong limit?}
-    Next -->|Có| Batch
-    Next -->|Không| Summary[summary.json]
+flowchart LR
+    Browser[Browser] --> Demo[Frontend demo :3000]
+    Demo -->|HTTP proxy| Controller
+    Client[API client] --> Controller
+    subgraph Backend[Backend collector - một JVM]
+      Controller[CollectionController] --> Service[CollectionService]
+      CLI[Application CLI] --> Batch[BatchService]
+      Batch --> Service
+      Controller --> White[WhitelistService]
+      White --> URLs[UrlListRepository]
+      Batch --> Output[BatchOutputRepository]
+      Service --> Download[DownloadService / Fetcher / UrlPolicy]
+      Service --> Parser[ContentExtractor]
+    end
+    Download --> HUST[Website HUST]
+    Output --> Disk[JSON / JSONL]
 ```
 
-Các module chạy cùng JVM, gọi phương thức trực tiếp. Chỉ `Fetcher` tải website; `Collector` ghi file. `DemoServer` dùng HTTP loopback để phục vụ giao diện/API local, không có queue, database hoặc dịch vụ từ xa.
+API không lưu output; CLI batch sở hữu phiên ghi output qua repository.
+Không có shared database hoặc HTTP nội bộ giữa download/parser.
+Maven aggregator root có đúng một module `backend`. Backend có POM, Dockerfile,
+entry point và health check riêng. Demo nằm trong profile Compose `demo` tùy chọn.
 
-### Stack và đóng gói
+## 3. Layer và dependency
 
-Phiên bản lấy từ [pom.xml](../pom.xml), không phải khuyến nghị phiên bản mới nhất.
+| Package/class | Trách nhiệm |
+|---|---|
+| `Application` | `@SpringBootApplication`, chọn chế độ API/CLI, parse option |
+| `config` | Khai báo Spring bean, SERVER_HOST/SERVER_PORT và container health probe |
+| `controller` | Spring MVC routing, Bean Validation, HTTP status và backpressure |
+| `dto` | Hợp đồng response HTTP |
+| `service/CollectionService` | Policy đầu vào và pipeline download/parser dùng chung |
+| `service/DownloadService` | Retry I/O/429/5xx quanh Fetcher |
+| `service/BatchService` | Vòng lặp URL, dedup URL/text, status và summary |
+| `service/WhitelistService` | Tìm tối đa 20 gợi ý trong whitelist |
+| `repository/UrlListRepository` | Đọc whitelist classpath và file TXT batch |
+| `repository/BatchOutputRepository` | Mở output mới, serialize, flush và đóng tài nguyên |
+| `model` | Link, FetchedContent, ExtractedContent, Document, CollectionResult, BatchSummary, CollectionOutcome |
+| `crawl` | HTTP/robots/redirect/giới hạn tải và URL/IP policy |
+| `extract` | Jsoup/Tika và quy tắc nội dung |
 
-| Thành phần | Phiên bản | Vai trò |
-|---|---|---|
-| Java | compiler release 21 | CLI, HTTP client, filesystem, SHA-256 |
-| Jsoup | 1.21.2 | Parse DOM và lấy text HTML |
-| Apache Tika core + standard parsers | 3.2.3 | Nhận dạng MIME và trích xuất tài liệu |
-| crawler-commons | 1.6 | Parse robots.txt |
-| Jackson databind | 2.19.2 | Serialize record thành JSON/JSONL |
-| Logback classic | 1.5.18 | Log thư viện ra stderr, mức WARN |
-| log4j-to-slf4j | 2.24.3 | Chuyển log Log4j sang SLF4J |
-| JUnit Jupiter / AssertJ | 5.12.2 / 3.27.4 | Kiểm thử và assertion |
+Controller không tải HTTP đích, không gọi parser trực tiếp và không thao tác filesystem.
+Service không phụ thuộc Servlet API. Repository không phụ thuộc controller/service.
+`Downloader` là điểm tiêm fixture cho test. Các model không chứa logic transport hoặc lưu trữ.
 
-Maven Shade tạo `target/collector.jar` kèm dependency, đặt main class là `vn.edu.hust.collector.Collector`. `ServicesResourceTransformer` gộp khai báo service từ dependency, có ý nghĩa với cơ chế nạp parser Tika. Không cần cài Jsoup/Tika riêng. Repo chưa có Maven Wrapper.
-
-## 3. Module và hợp đồng nội bộ
-
-| Mã nguồn | Phương thức chính | Trách nhiệm |
-|---|---|---|
-| [Collector.java](../src/main/java/vn/edu/hust/collector/Collector.java) | `main`, `readInput`, `run`, `process`, `fetchWithRetry` | CLI, batch, retry, dedup, đếm và ghi file |
-| [DemoServer.java](../src/main/java/vn/edu/hust/collector/DemoServer.java) | `start`, `handle`, `extract`, `whitelist` | Web tĩnh, API gợi ý whitelist và API bóc tách một URL trên localhost |
-| [UrlPolicy.java](../src/main/java/vn/edu/hust/collector/crawl/UrlPolicy.java) | `normalize`, `inDomain`, `loginUrl`, `checkFetch` | Quy tắc URL và kiểm tra đích tải |
-| [Fetcher.java](../src/main/java/vn/edu/hust/collector/crawl/Fetcher.java) | `fetch`, `allowed`, `request` | HTTP, robots cache, redirect, delay, giới hạn byte |
-| [ContentExtractor.java](../src/main/java/vn/edu/hust/collector/extract/ContentExtractor.java) | `extract`, `extractLinks`, `clean` | Nhận dạng, title/text/links, quyết định giữ/bỏ |
-
-- `Downloader.fetch(url)` là interface nội bộ để truyền cách tải vào Collector. Production dùng retry; test dùng dữ liệu giả, không cần gọi website thật.
-- `Fetched(url, status, mime, bytes)` mang phản hồi HTTP cuối về collector.
-- `Extracted(title, text, type, links, keep, reason)` mang kết quả bóc tách và quyết định giữ/bỏ.
-- `Outcome(result, document)` ghép báo cáo URL với document tùy chọn; chỉ KEPT tạo document.
-- `Result`, `Document`, `Summary` là Java record, xác định trực tiếp tên trường JSON đầu ra.
-- `validateDomain` có trong UrlPolicy nhưng CLI chưa gọi. Domain production cố định `hust.edu.vn`.
+Giữ nguyên Java release 21, Jsoup 1.21.2, Tika 3.2.3, crawler-commons 1.6 và Jackson 2.19.2.
+Dependency đầy đủ: [backend/pom.xml](../backend/pom.xml).
+Spring Boot Maven Plugin tạo executable JAR `backend/target/collector.jar`, main
+`vn.edu.hust.collector.Application`. JAR không có HTML/CSS/JS của demo.
 
 ## 4. Các chế độ đầu vào
 
@@ -96,27 +72,23 @@ Maven Shade tạo `target/collector.jar` kèm dependency, đặt main class là 
 | `--input` | File UTF-8 tối đa 10 MiB |
 | `--limit` | Số dòng URL xử lý; mặc định 100, CLI chấp nhận 1–50.000 |
 | `--output` | Thư mục mới; mặc định `output/run-<Instant>` với dấu `:` đổi thành `-` |
-| `--help` | In hướng dẫn rồi thoát; không có tham số cũng in help |
-| `--serve [port]` | Chạy giao diện loopback; port mặc định 8080, xử lý tuần tự |
+| `--help` | In hướng dẫn rồi thoát; không có tham số thì chạy API |
+| `--serve [port]` | Chạy backend API; port mặc định 8080, frontend riêng tại 3000 |
+| `--health-check` | Probe nội bộ `/health` cho Docker HEALTHCHECK |
 
-Ngoài nhánh đặc biệt `--serve [port]`, CLI nhận cặp option/value, từ chối option lạ/lặp và yêu cầu đúng một trong `--url`, `--input`. Các ràng buộc này nằm ở `main`; gọi `run` trực tiếp từ Java chỉ kiểm tra limit dương, không có trần 50.000.
+Ngoài nhánh đặc biệt `--serve [port]`, CLI nhận cặp option/value, từ chối option lạ/lặp và yêu cầu đúng một trong `--url`, `--input`. Các ràng buộc này nằm ở `main`; `BatchService.run` cũng kiểm tra limit 1–50.000.
 
-### Chế độ web và API
+### Chế độ API và frontend demo
 
-Server bind địa chỉ loopback, dùng một executor đơn luồng và tắt cache cho resource/JSON. Đây là API hỗ trợ demo local, không có xác thực hoặc thiết kế để triển khai công khai.
+Backend mặc định bind loopback, có thể cấu hình host/port bằng environment.
+`CollectionController` chỉ xử lý JSON và gọi service, không đọc resource UI.
+Spring MVC nhận request; semaphore giới hạn một request thu thập đang chạy, request tiếp theo
+nhận HTTP 429 thay vì chờ vô hạn. Actuator health và whitelist vẫn phục vụ đồng thời.
+`CollectionService` đồng bộ truy cập Fetcher/parser để giữ an toàn cache theo host.
 
-| Method/path | Đầu vào | Đầu ra |
-|---|---|---|
-| `GET /` | Không | Giao diện HTML |
-| `GET /styles.css`, `GET /app.js` | Không | Resource frontend |
-| `GET /api/whitelist?q=...` | Query tối đa 300 ký tự | `success`, tổng URL và tối đa 20 URL khớp |
-| `POST /api/extract` | JSON `{ "url": "..." }`, tối đa 8.192 byte | Title, text, links, HTTP/MIME/thời gian hoặc lỗi có reason |
-
-`POST /api/extract` chuẩn hóa URL, chỉ nhận HUST, bỏ login, tải qua Fetcher rồi dùng cùng ContentExtractor với CLI. API trả 200 khi thành công, 400 cho request/URL sai, 413 khi request quá lớn, 422 khi nội dung bị loại và 502 khi tải/HTTP/parser lỗi.
-
-Chế độ web đọc `N06_Ctrl+F.txt` từ classpath một lần khi khởi động, bỏ phần giới thiệu, dấu phẩy cuối và URL trùng. Bản hiện tại có 9.516 URL duy nhất. Tìm kiếm không phân biệt hoa thường.
-
-File TXT do người dùng chọn được JavaScript đọc cục bộ, không upload. Client dùng regex tìm URL, chỉ giữ HUST/subdomain, loại trùng và giới hạn 10 MiB/50.000 URL; tối đa 200 kết quả phù hợp được vẽ mỗi lần. Chọn một URL chỉ điền vào form, không tự gửi request và không chạy batch.
+Endpoint, status, validation và compatibility alias được mô tả tại [api.md](api.md).
+Frontend là client tùy chọn trong `frontend/demo`; Node chỉ serve static/proxy API.
+TXT import vẫn được đọc trong trình duyệt, không upload hoặc tự chạy batch.
 
 ### Đọc input CLI
 
@@ -296,9 +268,9 @@ Output phải chưa tồn tại, kể cả thư mục rỗng. File JSONL mở v�
 
 Nếu ngắt giữa hai lần ghi, document có thể chưa có result tương ứng; dòng cuối cần kiểm tra tính toàn vẹn. Lỗi filesystem thoát ngoài process, dừng batch, có thể thiếu summary. Không có checkpoint/resume.
 
-Lỗi từng URL thường được đổi thành Result để tiếp tục. Batch có FAILED vẫn có thể exit code 0. `main` chỉ gọi `System.exit(1)` khi có exception thoát ra ngoài như lỗi tham số/input/output. Script tự động phải đọc summary nếu muốn xem lỗi từng URL là job thất bại.
+Lỗi từng URL thường được đổi thành Result để tiếp tục. Batch có FAILED vẫn có thể exit code 0. `Application.main` chỉ gọi `System.exit(1)` khi có exception thoát ra ngoài như lỗi tham số/input/output. Script tự động phải đọc summary nếu muốn xem lỗi từng URL là job thất bại.
 
-Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời điểm request theo host. Byte tài nguyên được giữ trong RAM để parse; không lưu raw HTML/PDF. Code/collection hiện tại chưa thiết kế cho xử lý đa luồng.
+Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời điểm request theo host. Byte tài nguyên được giữ trong RAM để parse; không lưu raw HTML/PDF. Batch chạy tuần tự; API giới hạn một request thu thập và vẫn phục vụ health/whitelist đồng thời.
 
 ## 11. Mẫu thực tế đã commit
 
@@ -313,20 +285,20 @@ Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời đi�
 | 5 | URL ASSO | SKIPPED, LOGIN_REQUIRED |
 | 6 | Lặp URL dòng 1 | DUPLICATE, URL_MATCH |
 
-Đây là dữ liệu lịch sử, không bảo đảm website hiện trả giống hệt. `documents.pretty.json` và `document-1.txt`…`document-3.txt` là bản đọc thuận tiện có sẵn trong mẫu; CLI chỉ tự sinh ba file chuẩn. Mẫu này chưa chứng minh độ chính xác trên toàn N06.
+Đây là dữ liệu lịch sử, không bảo đảm website hiện trả giống hệt. `documents.pretty.json` và `document-1.txt`…`document-3.txt` là bản đọc thuận tiện có sẵn trong mẫu; CLI sinh bốn file chuẩn. Mẫu này chưa chứng minh độ chính xác trên toàn N06.
 
 ## 12. Điểm sửa và kiểm chứng
 
 | Muốn thay đổi | Điểm bắt đầu | Kiểm chứng |
 |---|---|---|
-| Option, limit, schema, dedup | Collector | CollectorTest và JAR/input nhỏ |
+| Option, limit, schema, dedup | Application / BatchService / BatchOutputRepository | BatchServiceTest và JAR/input nhỏ |
 | Query, domain, login URL | UrlPolicy | UrlPolicyTest, không phá query định danh |
-| Retry | Collector.fetchWithRetry | Cần fixture retry, hiện chưa có test riêng |
+| Retry | DownloadService.fetch | Cần fixture retry, hiện chưa có test riêng |
 | Robots, redirect, size, delay | Fetcher | FetcherTest với server cục bộ |
 | Vùng nội dung, ngưỡng giữ/bỏ | ContentExtractor | ContentExtractorTest và HTML có nhãn |
 | Loại tài liệu mới | Allowlist extractor, dependency nếu cần | Fixture định dạng đó và JAR đóng gói |
-| Whitelist, import TXT, giao diện/API | DemoServer và `resources/web/` | DemoServerTest, `node --check` và smoke test trình duyệt |
+| Whitelist, import TXT, giao diện/API | CollectionController, WhitelistService và `frontend/demo/` | ApplicationTest, `node --check` và smoke test trình duyệt |
 
-Hướng mở rộng đề xuất, **chưa triển khai**: đánh giá mẫu nhiều subdomain/định dạng trước khi chỉnh heuristic; thêm test retry/lỗi; manifest lần chạy/schema version nếu cần tái lập; checkpoint/raw storage nếu chạy dài; sau đó dùng documents cho index tìm kiếm. Sửa normalization sẽ ảnh hưởng hash/dedup nên cần đánh giá lại mẫu.
+Hướng mở rộng đề xuất, **chưa triển khai**: đánh giá mẫu nhiều subdomain/định dạng trước khi chỉnh heuristic; thêm test retry/lỗi; manifest lần chạy/schema version nếu cần tái lập; checkpoint/raw storage nếu chạy dài. Tìm kiếm Lucene/TF-IDF đã được triển khai, xem [search.md](search.md). Sửa normalization sẽ ảnh hưởng hash/dedup nên cần đánh giá lại mẫu.
 
 Phạm vi kiểm thử và hạn chế xác minh: [validation.md](validation.md).

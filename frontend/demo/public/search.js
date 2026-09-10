@@ -1,0 +1,146 @@
+const $ = selector => document.querySelector(selector);
+let corpus = null;
+let ready = false;
+let busy = false;
+let selectionVersion = 0;
+const MAX_BYTES = 20 * 1024 * 1024;
+
+function message(text, error = false) {
+  $('#search-message').textContent = text;
+  $('#search-message').className = error ? 'error' : '';
+}
+function controls(value) {
+  busy = value;
+  $('#build-index').disabled = busy || !corpus;
+  $('#search-button').disabled = busy || !ready;
+  $('#sample').disabled = busy;
+  $('#corpus').disabled = busy;
+  document.querySelectorAll('[data-query]').forEach(button => { button.disabled = busy; });
+}
+async function api(path, options = {}) {
+  const response = await fetch(path, { ...options, signal: AbortSignal.timeout(300000) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Không xử lý được yêu cầu.');
+  return data;
+}
+function renderIndex(data) {
+  ready = data.ready;
+  $('#index-state').textContent = ready
+    ? 'Đã lập chỉ mục ' + data.documentCount + ' văn bản · ' + new Date(data.indexedAt).toLocaleString('vi-VN') + ' · TF-IDF'
+    : 'Chưa có chỉ mục. Chọn JSON rồi bấm Tạo chỉ mục.';
+  controls(busy);
+}
+async function selectCorpus(text, name, version) {
+  if (version !== selectionVersion) return;
+  corpus = null;
+  controls(false);
+  try {
+    if (new TextEncoder().encode(text).length > MAX_BYTES) throw new Error('File vượt quá 20 MiB.');
+    const data = JSON.parse(text.replace(/^\uFEFF/, ''));
+    if (!Array.isArray(data) || !data.length || data.length > 10000)
+      throw new Error('Cần mảng JSON gồm 1–10.000 văn bản.');
+    if (data.some(doc => !doc || typeof doc.text !== 'string' || !doc.text.trim()))
+      throw new Error('Mỗi văn bản cần trường text là chuỗi không rỗng.');
+    corpus = JSON.stringify(data);
+    $('#corpus-preview').textContent = name + ' · ' + data.length + ' văn bản · Chưa tạo chỉ mục từ file này.';
+    message('Dữ liệu đã sẵn sàng. Bấm Tạo chỉ mục để sử dụng.');
+  } catch (error) {
+    $('#corpus-preview').textContent = 'Tập văn bản không hợp lệ.';
+    message(error.message, true);
+  }
+  controls(false);
+}
+$('#corpus').addEventListener('change', async event => {
+  const version = ++selectionVersion;
+  corpus = null;
+  controls(false);
+  const file = event.target.files[0];
+  if (!file) { $('#corpus-preview').textContent = 'Chưa chọn tập văn bản.'; return; }
+  try {
+    if (file.size > MAX_BYTES) throw new Error('File vượt quá 20 MiB.');
+    controls(true);
+    await selectCorpus(await file.text(), file.name, version);
+  } catch (error) { message(error.message, true); controls(false); }
+});
+$('#sample').addEventListener('click', async () => {
+  const version = ++selectionVersion;
+  corpus = null;
+  controls(true);
+  try {
+    const response = await fetch('/sample-documents.json');
+    if (!response.ok) throw new Error('Không tải được dữ liệu mẫu.');
+    $('#corpus').value = '';
+    await selectCorpus(await response.text(), 'Bộ mẫu minh họa TF-IDF (tự soạn)', version);
+  } catch (error) { message(error.message, true); controls(false); }
+});
+$('#build-index').addEventListener('click', async () => {
+  if (!corpus || busy) return;
+  controls(true);
+  message('Đang tạo chỉ mục…');
+  $('#search-results').hidden = true;
+  try {
+    renderIndex(await api('/api/v1/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpus }));
+    $('#corpus-preview').textContent = $('#corpus-preview').textContent.replace('Chưa tạo chỉ mục từ file này.', 'Đã tạo chỉ mục từ tập văn bản này.');
+    message('Tạo chỉ mục thành công. Nhập truy vấn để tìm kiếm.');
+    $('#query').focus();
+  } catch (error) { message(error.message, true); }
+  finally { controls(false); }
+});
+function element(tag, text, className) {
+  const node = document.createElement(tag);
+  node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+function detail(label, text, tag = 'p') {
+  const node = document.createElement('details');
+  node.append(element('summary', label), element(tag, text, 'full-text'));
+  return node;
+}
+function renderResults(data) {
+  $('#search-results').hidden = false;
+  $('#result-summary').textContent = data.total
+    ? 'Hiển thị ' + data.results.length + '/' + data.total + ' kết quả · Điểm TF-IDF giảm dần'
+    : 'Không có văn bản khớp truy vấn. Thử từ khác hoặc kiểm tra tập văn bản đã nạp.';
+  $('#query-tokens').textContent = 'Token truy vấn: ' + data.tokens.join(' · ');
+  $('#hits').replaceChildren(...data.results.map((hit, index) => {
+    const card = element('article', '', 'hit');
+    card.append(element('div', '#' + (index + 1) + ' · Điểm ' + hit.score.toFixed(6) + ' · ' + hit.id, 'hit-score'));
+    card.append(element('h3', hit.title || '(Không có tiêu đề)'));
+    if (hit.url) {
+      try {
+        const url = new URL(hit.url);
+        if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) {
+          const link = element('a', hit.url);
+          link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          card.append(link);
+        }
+      } catch { /* A source URL is optional and never executed as markup. */ }
+    }
+    card.append(element('p', hit.text.slice(0, 320) + (hit.text.length > 320 ? '…' : '')));
+    card.append(detail('Xem toàn bộ văn bản', hit.text), detail('Giải thích điểm TF-IDF', hit.explanation, 'pre'));
+    return card;
+  }));
+}
+$('#search-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (busy || !ready) return;
+  controls(true);
+  $('#search-results').hidden = true;
+  message('Đang tìm kiếm…');
+  try {
+    const params = new URLSearchParams({ q: $('#query').value, limit: $('#limit').value });
+    renderResults(await api('/api/v1/search?' + params));
+    message('Tìm kiếm hoàn tất.');
+  } catch (error) { message(error.message, true); }
+  finally { controls(false); }
+});
+document.querySelectorAll('[data-query]').forEach(button => button.addEventListener('click', () => {
+  $('#query').value = button.dataset.query;
+  if (ready) $('#search-form').requestSubmit();
+  else message('Hãy tạo chỉ mục trước khi tìm kiếm.');
+}));
+api('/api/v1/index').then(renderIndex).catch(error => {
+  $('#index-state').textContent = 'Không kiểm tra được chỉ mục. Kiểm tra backend rồi tải lại trang.';
+  message(error.message, true);
+});

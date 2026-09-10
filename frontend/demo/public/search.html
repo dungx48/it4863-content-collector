@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ctrl+F — Tìm kiếm TF-IDF</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/search.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">C<span>+</span>F</span><span><strong>Ctrl+F</strong><small>Nhóm N06 · IT4863</small></span></a>
+    <nav aria-label="Màn hình demo"><a href="/">Thu thập</a> · <a href="/search" aria-current="page">Tìm kiếm TF-IDF</a></nav>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">TRÌNH DIỄN TÌM KIẾM · APACHE LUCENE</p>
+      <h1>Từ tập văn bản<br><em>đến kết quả phù hợp.</em></h1>
+      <p class="lead">Nạp dữ liệu JSON, tạo chỉ mục và tìm kiếm theo TF-IDF. Xem điểm số và cách từng từ đóng góp vào thứ hạng.</p>
+      <div class="pipeline" aria-label="Quy trình"><span>01 · Văn bản JSON</span><span>→</span><span>02 · Chỉ mục Lucene</span><span>→</span><span>03 · Kết quả TF-IDF</span></div>
+    </section>
+    <section class="search-panel" aria-labelledby="index-heading">
+      <p class="eyebrow">BƯỚC 01</p>
+      <h2 id="index-heading">Chuẩn bị tập văn bản</h2>
+      <p>Dùng file <code>documents.json</code> hoặc <code>documents.pretty.json</code> từ collector. Mảng JSON cần trường <code>text</code>; có thể thêm <code>id</code>, <code>title</code>, <code>url</code>. Tối đa 20 MiB / 10.000 văn bản.</p>
+      <div class="search-actions">
+        <label for="corpus">Chọn file JSON</label>
+        <input id="corpus" type="file" accept=".json,application/json">
+        <button id="sample" type="button">Dùng dữ liệu mẫu</button>
+        <a href="/sample-documents.json" download>Tải JSON mẫu</a>
+      </div>
+      <p id="corpus-preview" class="hint">Chưa chọn tập văn bản. Bộ mẫu gồm 6 văn bản tự soạn để minh họa xếp hạng.</p>
+      <p class="hint">Tạo chỉ mục sẽ thay thế toàn bộ tập văn bản đã lập chỉ mục trước đó.</p>
+      <button id="build-index" type="button" disabled>Tạo chỉ mục</button>
+      <p id="index-state" role="status">Đang kiểm tra chỉ mục…</p>
+    </section>
+    <section class="search-panel" aria-labelledby="query-heading">
+      <p class="eyebrow">BƯỚC 02</p>
+      <h2 id="query-heading">Tìm kiếm văn bản</h2>
+      <form id="search-form">
+        <label for="query">Truy vấn</label>
+        <div class="search-row">
+          <input id="query" type="search" required maxlength="500" placeholder="Ví dụ: học bổng" autocomplete="off">
+          <label for="limit">Top</label>
+          <select id="limit"><option>5</option><option selected>10</option><option>20</option><option>50</option></select>
+          <button id="search-button" type="submit" disabled>Tìm kiếm</button>
+        </div>
+      </form>
+      <div class="search-actions query-examples"><span>Thử với bộ mẫu:</span><button type="button" data-query="học bổng">học bổng</button><button type="button" data-query="lucene">lucene</button><button type="button" data-query="thực tập">thực tập</button></div>
+      <p class="hint">Tìm trong tiêu đề + nội dung. Khớp ít nhất một token (OR), không phân biệt hoa/thường, có phân biệt dấu tiếng Việt. Từ lặp trong truy vấn chỉ tính một lần.</p>
+    </section>
+    <p id="search-message" role="status" aria-live="polite"></p>
+    <section id="search-results" hidden aria-labelledby="results-heading">
+      <h2 id="results-heading">Kết quả tìm kiếm</h2>
+      <p id="result-summary"></p>
+      <p id="query-tokens"></p>
+      <div id="hits"></div>
+    </section>
+    <details class="search-panel">
+      <summary>Giải thích phương pháp TF-IDF</summary>
+      <p>Lucene dùng <strong>ClassicSimilarity</strong>. TF tăng theo căn bậc hai số lần xuất hiện; IDF cao hơn với từ xuất hiện trong ít văn bản. Điểm còn được chuẩn hóa theo độ dài trường văn bản.</p>
+      <p><code>tf = sqrt(freq)</code> · <code>idf = 1 + ln((N + 1) / (df + 1))</code> · <code>lengthNorm = 1 / sqrt(length)</code></p>
+      <p>Mở “Giải thích điểm” ở từng kết quả để xem phép tính thực tế của Lucene. Điểm không phải phần trăm chính xác; chỉ so sánh trong cùng truy vấn và cùng chỉ mục.</p>
+      <p>Văn bản và truy vấn được chuẩn hóa Unicode NFC rồi phân tích bằng StandardAnalyzer. Chưa ghép từ tiếng Việt nhiều âm tiết, bỏ dấu, stemming hay tìm kiếm ngữ nghĩa.</p>
+    </details>
+  </main>
+  <footer><span>Đại học Bách khoa Hà Nội</span><span>Spring Boot · Apache Lucene · TF-IDF</span></footer>
+  <script src="/search.js" defer></script>
+</body>
+</html>
