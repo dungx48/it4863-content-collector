@@ -9,7 +9,7 @@ import vn.edu.hust.collector.model.*;
 import vn.edu.hust.collector.repository.BatchOutputRepository;
 import org.springframework.stereotype.Service;
 
-/** Batch orchestration and deduplication; storage belongs to the repository. */
+/** Điều phối batch và loại trùng; repository chịu trách nhiệm ghi file. */
 @Service
 public class BatchService {
     private record Outcome(CollectionResult result, Document document) {}
@@ -22,11 +22,13 @@ public class BatchService {
         Set<String> seenUrls = new HashSet<>(), seenHashes = new HashSet<>();
         int kept=0, skipped=0, duplicate=0, failed=0, processed=0;
         try (var output = new BatchOutputRepository(directory)) {
+            // Ghi ngay sau mỗi URL để vẫn giữ kết quả nếu lượt chạy bị ngắt giữa chừng.
             for (String original : inputs.subList(0, Math.min(inputs.size(), limit))) {
                 Outcome outcome = process(original, seenUrls, seenHashes);
                 output.append(outcome.result(), outcome.document());
                 processed++;
                 switch (outcome.result().status()) {
+                    // Bộ đếm summary lấy từ chính status đã ghi ra results.jsonl.
                     case "KEPT" -> kept++;
                     case "SKIPPED" -> skipped++;
                     case "DUPLICATE" -> duplicate++;

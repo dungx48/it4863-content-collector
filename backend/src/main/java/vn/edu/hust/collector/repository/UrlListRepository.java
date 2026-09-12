@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class UrlListRepository {
     public List<String> readInput(Path path) throws IOException {
+        // Lọc header/chú thích: chỉ dòng bắt đầu bằng URL mới đi vào batch.
         if (Files.size(path) > 10 * 1024 * 1024) throw new IllegalArgumentException("Input exceeds 10 MiB");
         try (var lines = Files.lines(path, StandardCharsets.UTF_8)) {
             return lines.map(s -> s.replace("\uFEFF", "").strip())

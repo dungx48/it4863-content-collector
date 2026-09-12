@@ -28,6 +28,7 @@ public class Fetcher {
     /** Kiểm tra đích, áp delay theo host rồi gửi một GET không tự theo redirect. */
     private synchronized HttpResponse<java.io.InputStream> request(String url, String domain) throws Exception {
         policy.checkFetch(url, domain);
+        // Bộ đếm theo host giúp các request không dồn dập vào cùng website.
         String host = URI.create(url).getHost();
         long wait = delay - (System.currentTimeMillis() - lastRequest.getOrDefault(host, 0L));
         if (wait > 0) Thread.sleep(wait);
@@ -40,6 +41,7 @@ public class Fetcher {
         URI uri = URI.create(url);
         String origin = uri.getScheme() + "://" + uri.getAuthority();
         if (!robots.containsKey(origin)) {
+            // Mỗi origin chỉ tải robots.txt một lần trong vòng đời Fetcher.
             var response = request(origin + "/robots.txt", domain);
             try (var input = response.body()) {
                 int status = response.statusCode();
@@ -52,6 +54,7 @@ public class Fetcher {
             }
         }
         var rules = robots.get(origin);
+        // Tôn trọng crawl-delay nhưng chặn tối đa 60 giây để batch không treo vô hạn.
         if (rules.getCrawlDelay() > delay) Thread.sleep(Math.min(rules.getCrawlDelay(), 60_000));
         return rules.isAllowed(url);
     }
@@ -66,10 +69,12 @@ public class Fetcher {
             try (var input = response.body()) {
                 int status = response.statusCode();
                 if (Set.of(301,302,303,307,308).contains(status)) {
+                    // Redirect được xử lý thủ công để đích mới phải qua lại toàn bộ policy.
                     current = policy.normalize(URI.create(current).resolve(response.headers().firstValue("location").orElseThrow()).toString());
                     continue;
                 }
                 if (status != 200) return new FetchedContent(current, status, "", new byte[0]);
+                // Kiểm tra cả header và số byte thật vì Content-Length có thể thiếu hoặc sai.
                 if (response.headers().firstValueAsLong("content-length").orElse(0) > maxBytes) throw new IllegalArgumentException("DOWNLOAD_TOO_LARGE");
                 byte[] bytes = input.readNBytes(maxBytes + 1);
                 if (bytes.length > maxBytes) throw new IllegalArgumentException("DOWNLOAD_TOO_LARGE");

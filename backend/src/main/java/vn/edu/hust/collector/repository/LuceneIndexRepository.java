@@ -17,7 +17,7 @@ import org.springframework.stereotype.Repository;
 import vn.edu.hust.collector.dto.*;
 import vn.edu.hust.collector.model.SearchDocument;
 
-/** One committed corpus on disk. Requests in this JVM cannot observe partial replacements. */
+/** Lưu một corpus đã commit trên đĩa; request không thấy chỉ mục thay dở. */
 @Repository
 public class LuceneIndexRepository {
     private final Path path;
@@ -26,6 +26,7 @@ public class LuceneIndexRepository {
     }
 
     public static List<String> tokens(String value) throws IOException {
+        // StandardAnalyzer chuẩn hóa token giống nhau khi lập chỉ mục và tìm kiếm.
         try (var analyzer = new StandardAnalyzer();
              var stream = analyzer.tokenStream("content", Normalizer.normalize(value, Normalizer.Form.NFC))) {
             var term = stream.addAttribute(CharTermAttribute.class);
@@ -38,6 +39,7 @@ public class LuceneIndexRepository {
     }
 
     public synchronized IndexStatus status() throws IOException {
+        // Thư mục tồn tại chưa chắc đã chứa một Lucene index hợp lệ.
         try (var directory = FSDirectory.open(path)) {
             if (!DirectoryReader.indexExists(directory)) return new IndexStatus(false, 0, null, "ClassicSimilarity (TF-IDF)");
             try (var reader = DirectoryReader.open(directory)) {
@@ -57,6 +59,7 @@ public class LuceneIndexRepository {
                 .setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND).setCommitOnClose(false);
             try (var writer = new IndexWriter(directory, config)) {
                 try {
+                    // Xóa và thêm nằm trong một commit; rollback giữ corpus cũ khi lỗi.
                     writer.deleteAll();
                     for (var source : documents) {
                         var doc = new org.apache.lucene.document.Document();
@@ -64,7 +67,7 @@ public class LuceneIndexRepository {
                         doc.add(new StoredField("title", source.title()));
                         doc.add(new StoredField("url", source.url()));
                         doc.add(new StoredField("text", source.text()));
-                        // A single field avoids hidden title boosts and makes scores easier to explain.
+                        // Ghép title + text vào một field để điểm không có boost ẩn.
                         doc.add(new TextField("content", Normalizer.normalize(
                             source.title() + "\n" + source.text(), Normalizer.Form.NFC), Field.Store.NO));
                         writer.addDocument(doc);
@@ -87,6 +90,7 @@ public class LuceneIndexRepository {
             try (var reader = DirectoryReader.open(directory)) {
                 var searcher = new IndexSearcher(reader);
                 searcher.setSimilarity(new ClassicSimilarity());
+                // SHOULD tạo truy vấn OR: tài liệu khớp ít nhất một token vẫn xuất hiện.
                 var builder = new BooleanQuery.Builder();
                 for (String token : tokens) builder.add(new TermQuery(new Term("content", token)), BooleanClause.Occur.SHOULD);
                 var query = builder.build();
@@ -94,6 +98,7 @@ public class LuceneIndexRepository {
                 var hits = new ArrayList<SearchResponse.Hit>();
                 var stored = reader.storedFields();
                 for (var hit : top.scoreDocs) {
+                    // Stored fields trả dữ liệu gốc; explain trả phép tính điểm của Lucene.
                     var doc = stored.document(hit.doc);
                     hits.add(new SearchResponse.Hit(doc.get("id"), doc.get("title"), doc.get("url"), doc.get("text"),
                         hit.score, searcher.explain(query, hit.doc).toString()));

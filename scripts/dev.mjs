@@ -19,6 +19,7 @@ const abort = new AbortController();
 let stopping = false;
 
 function stop(code = 0) {
+  // Một tiến trình dừng thì launcher dọn cả backend và frontend.
   if (stopping) return;
   stopping = true;
   process.exitCode = code;
@@ -33,6 +34,7 @@ function stop(code = 0) {
 }
 
 function launch(name, command, args, env) {
+  // Kế thừa terminal hiện tại để log hai tiến trình xuất cùng một chỗ.
   const child = spawn(command, args, { cwd: root, env, stdio: ['ignore', 'inherit', 'inherit'], windowsHide: true });
   children.add(child);
   child.on('error', error => {
@@ -50,6 +52,7 @@ function launch(name, command, args, env) {
 }
 
 function checkPort(host, port) {
+  // Bind thử trước khi khởi động để báo EADDRINUSE rõ ràng.
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Ports must be 1..65535');
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
@@ -70,6 +73,7 @@ if (process.stdin.isTTY) {
 }
 
 try {
+  // JAR phải được build sẵn; launcher không âm thầm build lại source Java.
   try { await access(jar); }
   catch { throw new Error('Backend JAR is missing. Run mvn verify from the repository root first.'); }
   if (backendPort === demoPort) throw new Error('SERVER_PORT and DEMO_PORT must be different');
@@ -81,6 +85,7 @@ try {
     const deadline = Date.now() + 30_000;
     let ready = false;
     while (!stopping && Date.now() < deadline) {
+      // Chỉ mở frontend sau khi health backend thực sự UP.
       try {
         const response = await fetch(`${backendUrl}/health`, {
           signal: AbortSignal.any([abort.signal, AbortSignal.timeout(2000)]),

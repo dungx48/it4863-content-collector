@@ -9,6 +9,7 @@ import vn.edu.hust.collector.exception.ApiException;
 import vn.edu.hust.collector.model.SearchDocument;
 import vn.edu.hust.collector.repository.LuceneIndexRepository;
 
+/** Kiểm tra dữ liệu đầu vào trước khi giao việc lưu/tìm cho Lucene repository. */
 @Service
 public class SearchService {
     private final LuceneIndexRepository repository;
@@ -18,6 +19,7 @@ public class SearchService {
     public IndexStatus status() throws IOException { return repository.status(); }
 
     public IndexStatus index(byte[] body) throws IOException {
+        // FAIL_ON_TRAILING_TOKENS từ chối dữ liệu thừa sau JSON hợp lệ.
         JsonNode root;
         try { root = json.readTree(body); }
         catch (IOException error) { throw invalid("File không phải JSON hợp lệ."); }
@@ -26,6 +28,7 @@ public class SearchService {
         var documents = new ArrayList<SearchDocument>();
         var ids = new HashSet<String>();
         for (int i = 0; i < root.size(); i++) {
+            // Chỉ lấy bốn trường search cần; các trường collector khác được bỏ qua.
             var node = root.get(i);
             if (!node.isObject()) throw invalid("Văn bản thứ " + (i + 1) + " phải là object.");
             String text = field(node, "text", true, 2_000_000);
@@ -38,11 +41,12 @@ public class SearchService {
                 throw invalid("Văn bản thứ " + (i + 1) + " không có token để lập chỉ mục.");
             documents.add(new SearchDocument(id, title, text, url));
         }
-        // Validate the entire collection before touching the existing index.
+        // Chỉ thay chỉ mục sau khi toàn bộ corpus đã hợp lệ.
         return repository.replace(documents);
     }
 
     public SearchResponse search(String query, int limit) throws IOException {
+        // Analyzer của repository được dùng chung cho corpus và truy vấn.
         if (query == null || query.isBlank() || query.length() > 500 || limit < 1 || limit > 50)
             throw ApiException.badRequest("INVALID_QUERY", "Truy vấn cần 1–500 ký tự; số kết quả từ 1 đến 50.");
         var tokens = LuceneIndexRepository.tokens(query);
@@ -51,6 +55,7 @@ public class SearchService {
     }
 
     private String field(JsonNode node, String key, boolean required, int max) {
+        // Trường tùy chọn thiếu được chuẩn hóa thành chuỗi rỗng.
         var value = node.get(key);
         if (value == null || value.isNull()) {
             if (required) throw invalid("Thiếu trường " + key + ".");

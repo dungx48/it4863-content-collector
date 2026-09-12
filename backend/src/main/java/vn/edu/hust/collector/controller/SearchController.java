@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.edu.hust.collector.dto.*;
 import vn.edu.hust.collector.service.SearchService;
 
+/** Endpoint trạng thái, tạo chỉ mục và tìm kiếm TF-IDF. */
 @RestController
 @RequestMapping("/api/v1")
 public class SearchController {
@@ -19,7 +20,7 @@ public class SearchController {
 
     @PostMapping(value = "/index", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> index(HttpServletRequest request) throws IOException {
-        // Bound both fixed-length and chunked bodies before JSON parsing.
+        // Chặn cả body có Content-Length và body chunked trước khi parse JSON.
         if (request.getContentLengthLong() > MAX_CORPUS_BYTES) return tooLarge();
         byte[] body = request.getInputStream().readNBytes(MAX_CORPUS_BYTES + 1);
         if (body.length > MAX_CORPUS_BYTES) return tooLarge();

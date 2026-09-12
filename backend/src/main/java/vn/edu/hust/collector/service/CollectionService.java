@@ -22,6 +22,7 @@ public class CollectionService {
     }
 
     public String normalize(String input) {
+        // Policy chung bảo đảm API và CLI chấp nhận cùng một tập URL.
         String url = policy.normalize(input);
         if (!policy.inDomain(url, "hust.edu.vn")) throw new IllegalArgumentException("OUTSIDE_DOMAIN");
         if (policy.loginUrl(url)) throw new IllegalArgumentException("LOGIN_REQUIRED");
@@ -30,9 +31,11 @@ public class CollectionService {
 
     // Fetcher giữ cache robots/rate limit; tuần tự hóa để không phá trạng thái theo host.
     public CollectionOutcome collect(String input) throws Exception {
+        // API chỉ nhận một tác vụ thu thập nặng tại một thời điểm.
         if (!extractionSlot.tryAcquire()) throw new BusyException();
         try {
             synchronized (this) {
+                // Downloader giữ cache robots/rate-limit nên download và extract đi cùng một lượt.
                 long started = System.nanoTime();
                 var fetched = downloader.fetch(normalize(input));
                 var content = fetched.status() == 200
@@ -45,6 +48,7 @@ public class CollectionService {
     }
 
     public synchronized FetchedContent download(String input) throws Exception {
+        // Batch dùng hai bước để còn ghi được HTTP/status khi bước bóc tách thất bại.
         return downloader.fetch(normalize(input));
     }
 

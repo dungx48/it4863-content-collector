@@ -12,6 +12,7 @@ function message(text, error = false) {
   $('#search-message').className = error ? 'error' : '';
 }
 function controls(value) {
+  // Chỉ cho tìm khi backend báo đã có index; khóa thao tác khi request đang chạy.
   busy = value;
   $('#build-index').disabled = busy || (!corpus && !$('#corpus-text').value.trim());
   $('#search-button').disabled = busy || !ready;
@@ -21,12 +22,14 @@ function controls(value) {
   document.querySelectorAll('[data-query]').forEach(button => { button.disabled = busy; });
 }
 async function api(path, options = {}) {
+  // Tạo index có thể lâu nên frontend dùng timeout chung năm phút.
   const response = await fetch(path, { ...options, signal: AbortSignal.timeout(300000) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.message || 'Không xử lý được yêu cầu.');
   return data;
 }
 function renderIndex(data) {
+  // Trạng thái này lấy từ index đã commit trên backend, không lấy từ file đang chọn.
   ready = data.ready;
   $('#index-state').textContent = ready
     ? 'Đã lập chỉ mục ' + data.documentCount + ' văn bản · ' + new Date(data.indexedAt).toLocaleString('vi-VN') + ' · TF-IDF'
@@ -57,6 +60,7 @@ function selectCorpus(text, name, version) {
   }
 }
 $('#corpus').addEventListener('change', async event => {
+  // Version ngăn lần đọc file chậm ghi đè lựa chọn mới hơn.
   const version = ++selectionVersion;
   corpus = null;
   $('#corpus-text').value = '';
@@ -93,6 +97,7 @@ $('#sample').addEventListener('click', async () => {
   } catch (error) { message(error.message, true); controls(false); }
 });
 $('#build-index').addEventListener('click', async () => {
+  // Nội dung dán được parse tại đây để không parse lại sau mỗi phím gõ.
   if (busy) return;
   const pasted = $('#corpus-text').value.trim();
   if (pasted && !selectCorpus(pasted, 'Nội dung JSON đã dán', selectionVersion)) return;
@@ -109,6 +114,7 @@ $('#build-index').addEventListener('click', async () => {
   finally { controls(false); }
 });
 function element(tag, text, className) {
+  // Dùng textContent để dữ liệu corpus không được thực thi như HTML.
   const node = document.createElement(tag);
   node.textContent = text;
   if (className) node.className = className;
@@ -120,6 +126,7 @@ function detail(label, text, tag = 'p') {
   return node;
 }
 function renderResults(data) {
+  // Backend đã xếp hạng; frontend chỉ dựng card theo đúng thứ tự trả về.
   $('#search-results').hidden = false;
   $('#result-summary').textContent = data.total
     ? 'Hiển thị ' + data.results.length + '/' + data.total + ' kết quả · Điểm TF-IDF giảm dần'
@@ -145,6 +152,7 @@ function renderResults(data) {
   }));
 }
 $('#search-form').addEventListener('submit', async event => {
+  // URLSearchParams encode truy vấn trước khi gắn vào query string.
   event.preventDefault();
   if (busy || !ready) return;
   controls(true);

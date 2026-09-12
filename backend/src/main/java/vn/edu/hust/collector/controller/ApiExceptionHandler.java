@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.edu.hust.collector.dto.ErrorResponse;
 import vn.edu.hust.collector.exception.*;
 
+/** Chuẩn hóa exception của mọi controller thành ErrorResponse JSON. */
 @RestControllerAdvice
 public class ApiExceptionHandler {
     @ExceptionHandler(ApiException.class)
@@ -20,6 +21,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(BusyException.class)
     ResponseEntity<ErrorResponse> busy(BusyException error) {
+        // Retry-After gợi ý frontend thử lại sau khi tác vụ hiện tại kết thúc.
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .header(HttpHeaders.RETRY_AFTER, "1")
             .body(new ErrorResponse(false, "BUSY", error.getMessage()));
@@ -43,6 +45,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ErrorResponse> method(HttpRequestMethodNotSupportedException error) {
+        // Trả thêm Allow để client biết các HTTP method hợp lệ.
         var builder = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
         if (error.getSupportedHttpMethods() != null)
             builder.allow(error.getSupportedHttpMethods().toArray(HttpMethod[]::new));

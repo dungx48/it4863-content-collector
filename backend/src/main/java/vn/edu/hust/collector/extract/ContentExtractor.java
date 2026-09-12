@@ -14,12 +14,15 @@ public class ContentExtractor {
 
     /** Nhận dạng loại dữ liệu, bóc tách nội dung và áp quy tắc chất lượng. */
     public ExtractedContent extract(byte[] bytes, String url, String mime) throws Exception {
+        // Tika nhìn cả nội dung byte và tên file, đáng tin hơn chỉ đọc Content-Type HTTP.
         String detected = tika.detect(bytes, java.net.URI.create(url).getPath());
         boolean html = detected.contains("html") || mime.toLowerCase(Locale.ROOT).contains("html");
         if (html) {
+            // Jsoup giữ base URL để đổi href/src tương đối thành URL tuyệt đối.
             var doc = Jsoup.parse(new ByteArrayInputStream(bytes), null, url);
             if (!doc.select("input[type=password]").isEmpty()) return new ExtractedContent(doc.title(), "", "text/html", List.of(), false, "LOGIN_REQUIRED");
             String title = doc.selectFirst("h1") == null ? doc.title() : doc.selectFirst("h1").text();
+            // Bỏ vùng giao diện trước khi chọn nội dung để menu/footer không lẫn vào text.
             doc.select("script,style,noscript,nav,header,footer,aside,form,iframe,.breadcrumb,.breadcrumbs,.social-share,.share-icons").remove();
             Element main = null;
             // Ưu tiên vùng bài viết cụ thể trước các container rộng như <main>.
@@ -30,6 +33,7 @@ public class ContentExtractor {
             if (main == null) main = doc.body();
             List<Link> links = extractLinks(main);
             String text = clean(main.text());
+            // Loại trang quá ngắn hoặc chủ yếu dùng để điều hướng sang link khác.
             int linkLength = main.select("a").text().length();
             boolean useful = text.length() >= 120 && linkLength < text.length() * 0.55;
             String reason = useful ? "CONTENT" : (text.isBlank() ? "EMPTY_OR_JS_REQUIRED" : "SHORT_OR_LINK_LIST");
@@ -39,8 +43,10 @@ public class ContentExtractor {
         if (!(detected.equals("application/pdf") || detected.contains("officedocument") || detected.contains("msword") ||
               detected.contains("ms-excel") || detected.contains("ms-powerpoint") || detected.contains("opendocument") || detected.equals("application/rtf")))
             return new ExtractedContent("", "", detected, List.of(), false, "UNSUPPORTED_TYPE");
+        // Tika tự chọn parser PDF/Office; giới hạn text để tránh tài liệu làm đầy bộ nhớ.
         var metadata = new org.apache.tika.metadata.Metadata();
         String text = clean(tika.parseToString(new ByteArrayInputStream(bytes), metadata, 2_000_000));
+        // Ưu tiên tiêu đề nhúng trong file, nếu thiếu dùng path làm tên nhận biết.
         String title = metadata.get("dc:title");
         if (title == null || title.isBlank()) title = java.net.URI.create(url).getPath();
         return new ExtractedContent(title, text, detected, List.of(), !text.isBlank(), text.isBlank() ? "EMPTY_OR_NEEDS_OCR" : "CONTENT");

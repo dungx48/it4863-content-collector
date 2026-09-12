@@ -7,7 +7,7 @@ import vn.edu.hust.collector.dto.*;
 import vn.edu.hust.collector.exception.*;
 import vn.edu.hust.collector.service.*;
 
-/** Spring MVC adapter: validates HTTP input and maps service results to the API contract. */
+/** Adapter HTTP: kiểm tra request và đổi kết quả service thành response API. */
 @RestController
 public class CollectionController {
     private final CollectionService collection;
@@ -21,6 +21,7 @@ public class CollectionController {
         consumes = MediaType.APPLICATION_JSON_VALUE,
         produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> extract(@Valid @RequestBody ExtractionRequest request) {
+        // Trả lỗi URL trước khi bắt đầu tải để client nhận mã lỗi rõ ràng.
         String url;
         try {
             url = collection.normalize(request.url());
@@ -36,6 +37,7 @@ public class CollectionController {
                     "Website trả về HTTP " + fetched.status() + ".");
             }
             var content = outcome.content();
+            // HTTP 200 vẫn có thể bị từ chối vì nội dung rỗng, ngắn hoặc không hỗ trợ.
             if (!content.keep()) {
                 return ResponseEntity.unprocessableContent().body(new RejectedExtractionResponse(
                     false, content.reason(), reasonMessage(content.reason()), fetched.url(), fetched.status()));
@@ -55,6 +57,7 @@ public class CollectionController {
     }
 
     static String reasonMessage(String reason) {
+        // Đổi mã nội bộ thành thông báo tiếng Việt; mã lạ vẫn được giữ để debug.
         return switch (reason == null ? "" : reason) {
             case "OUTSIDE_DOMAIN" -> "Chỉ chấp nhận link thuộc hust.edu.vn.";
             case "LOGIN_REQUIRED" -> "Trang yêu cầu đăng nhập nên không được thu thập.";

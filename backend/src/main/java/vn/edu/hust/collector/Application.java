@@ -11,11 +11,12 @@ import vn.edu.hust.collector.config.HealthCheck;
 import vn.edu.hust.collector.repository.UrlListRepository;
 import vn.edu.hust.collector.service.*;
 
-/** Spring Boot entry point; starts REST API by default and supports a non-web batch mode. */
+/** Điểm vào: mặc định chạy REST API, hoặc chạy batch CLI không mở web server. */
 @SpringBootApplication
 public class Application {
     public static void main(String[] args) {
         try {
+            // Chọn đúng một chế độ trước khi khởi tạo Spring context.
             if (Arrays.asList(args).contains("--help")) { help(); return; }
             if (args.length == 1 && "--health-check".equals(args[0])) {
                 HealthCheck.main(new String[0]);
@@ -36,9 +37,11 @@ public class Application {
     }
 
     private static void runBatch(String[] args) throws Exception {
+        // Dùng bean nghiệp vụ thật nhưng tắt web server để CLI nhẹ hơn.
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(Application.class)
                 .web(WebApplicationType.NONE).bannerMode(Banner.Mode.OFF).run()) {
             var options = new HashMap<String,String>();
+            // CLI dùng cặp --option value và từ chối option lặp/không biết.
             for (int i=0;i<args.length;i+=2) {
                 if (!Set.of("--url","--input","--output","--limit").contains(args[i]) || i+1>=args.length || options.putIfAbsent(args[i],args[i+1])!=null)
                     throw new IllegalArgumentException("Invalid or repeated option. Use --help.");
@@ -48,6 +51,7 @@ public class Application {
             int limit = Integer.parseInt(options.getOrDefault("--limit","100"));
             if (limit < 1 || limit > 50000) throw new IllegalArgumentException("--limit must be 1..50000");
             var repository = context.getBean(UrlListRepository.class);
+            // --url tạo danh sách một phần tử để dùng chung BatchService với --input.
             var inputs = options.containsKey("--url") ? List.of(options.get("--url")) : repository.readInput(Path.of(options.get("--input")));
             if (inputs.isEmpty()) throw new IllegalArgumentException("Input has no HTTP(S) URL lines.");
             Path output = Path.of(options.getOrDefault("--output","output/run-"+Instant.now().toString().replace(':','-')));

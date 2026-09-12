@@ -22,6 +22,7 @@ function jsonError(response, status, message) {
 
 /** Static demo + same-origin API proxy. No collection/business logic here. */
 export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
+  // Chỉ nhận một origin để path request luôn do server tự quyết định.
   const backend = new URL(backendUrl);
   if (!['http:', 'https:'].includes(backend.protocol) || backend.username || backend.password
       || backend.pathname !== '/' || backend.search || backend.hash) {
@@ -33,6 +34,7 @@ export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
     try {
       const url = new URL(request.url, 'http://demo.local');
       if (apiPaths.has(url.pathname)) {
+        // Mỗi API chỉ cho đúng method mà backend công bố.
         const allowed = url.pathname.endsWith('/index') ? ['GET', 'POST']
           : [url.pathname.endsWith('/extract') ? 'POST' : 'GET'];
         if (!allowed.includes(request.method)) {
@@ -41,6 +43,7 @@ export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
           return;
         }
         let size = 0;
+        // Index cần corpus lớn; extract chỉ cần JSON chứa một URL.
         const maxBytes = url.pathname.endsWith('/index') ? 20 * 1024 * 1024 : 8192;
         const chunks = [];
         for await (const chunk of request) {
@@ -52,6 +55,7 @@ export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
           chunks.push(chunk);
         }
         const upstream = await fetch(new URL(url.pathname + url.search, backend), {
+          // Proxy giữ cùng origin cho browser và chuyển nguyên status/body backend.
           method: request.method,
           headers: { 'Content-Type': request.headers['content-type'] || 'application/json' },
           body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
@@ -74,6 +78,7 @@ export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
         return;
       }
       const asset = files.get(url.pathname);
+      // Map cố định tránh biến URL thành đường dẫn file tùy ý.
       if (!asset) { jsonError(response, 404, 'Not found'); return; }
       const [name, type] = asset;
       const body = await readFile(new URL(`./public/${name}`, import.meta.url));
@@ -87,6 +92,7 @@ export function createDemoServer(backendUrl = 'http://127.0.0.1:8080') {
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  // Chỉ listen khi chạy trực tiếp; test có thể import createDemoServer.
   const port = Number(process.env.DEMO_PORT || 3000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('DEMO_PORT must be 1..65535');
   const host = process.env.DEMO_HOST || '127.0.0.1';

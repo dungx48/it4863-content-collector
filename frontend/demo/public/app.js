@@ -55,13 +55,14 @@ const MAX_IMPORTED_URLS = 50000;
 const MAX_VISIBLE_IMPORTED_URLS = 200;
 const MAX_SELECTED_URLS = 10;
 
-// Nguồn URL: link mẫu và file TXT cục bộ.
+// Điền link mẫu; người dùng vẫn chủ động bấm Bóc tách.
 document.querySelector('#example').addEventListener('click', () => {
   urlInput.value = sampleUrl;
   urlInput.focus();
 });
 
 fileInput.addEventListener('change', async () => {
+  // File chỉ được đọc trong trình duyệt, không upload lên backend.
   const file = fileInput.files[0];
   if (!file) return;
   if (file.size > MAX_FILE_BYTES) {
@@ -91,6 +92,7 @@ importFilter.addEventListener('keydown', event => {
 });
 
 importedList.addEventListener('change', event => {
+  // Set giữ lựa chọn khi danh sách được vẽ lại do lọc.
   const checkbox = event.target;
   if (checkbox.type !== 'checkbox') return;
   if (checkbox.checked && selectedUrls.size < MAX_SELECTED_URLS) selectedUrls.add(checkbox.value);
@@ -135,6 +137,7 @@ batchSubmit.addEventListener('click', async () => {
     const batch = await collectBatch(urls, extractOne, {
       signal: batchController.signal,
       onResult: (outcome, processed, total) => {
+        // Cập nhật từng dòng ngay khi URL hoàn tất thay vì chờ cả lô.
         counts[outcome.status]++;
         appendBatchOutcome(outcome);
         batchProgress.textContent = `${processed}/${total} URL · ${counts.success} thành công · ${counts.failed} lỗi · ${counts.duplicate} trùng`;
@@ -158,6 +161,7 @@ batchStop.addEventListener('click', () => {
 });
 
 async function extractOne(url, signal) {
+  // Một hàm gọi API dùng chung cho chạy đơn và chạy lô.
   const response = await fetch('/api/v1/extract', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -184,6 +188,7 @@ form.addEventListener('submit', async (event) => {
   try {
     const data = await extractOne(urlInput.value.trim());
     latestResults = [data];
+    // Kết quả đơn dùng cùng bảng và hộp thoại với kết quả lô.
     appendBatchOutcome({ status: 'success', document: data, url: data.url });
     batchResults.hidden = false;
     batchProgress.textContent = '1/1 URL · 1 thành công';
@@ -214,6 +219,7 @@ if (new URLSearchParams(window.location.search).get('demo') === '1') {
 }
 
 function render(data) {
+  // Đổ bài đang chọn vào hộp thoại; không sửa tập JSON xuất chung.
   setText('#http-status', data.httpStatus);
   setText('#content-type', data.contentType);
   setText('#char-count', numberFormat.format(data.text.length));
@@ -247,6 +253,7 @@ function render(data) {
 
 // Trích URL trong văn bản, chỉ giữ domain HUST và loại trùng.
 function parseImportedUrls(text) {
+  // Regex tìm ứng viên; URL API kiểm tra cú pháp/domain lần cuối.
   const found = text.match(/https?:\/\/[^\s<>"']+/gi) || [];
   const unique = new Set();
   for (const candidate of found) {
@@ -285,6 +292,7 @@ function renderImportedUrls() {
 }
 
 function updateSelection() {
+  // Khóa input trong lúc chạy và khóa ô chưa chọn khi đã đủ 10 URL.
   const running = batchRunning || singleRunning;
   selectedCount.textContent = `Đã chọn ${selectedUrls.size}/${MAX_SELECTED_URLS}`;
   document.querySelector('#clear-selection').disabled = running || !selectedUrls.size;
@@ -332,6 +340,7 @@ function appendBatchOutcome(outcome) {
 }
 
 function showImportError(message) {
+  // Xóa dữ liệu file cũ để người dùng không vô tình chạy nhầm danh sách.
   importedUrls = [];
   selectedUrls.clear();
   fileInput.value = '';
@@ -381,6 +390,7 @@ function setBatchLoading(loading) {
 }
 
 async function copy(value, button) {
+  // Phản hồi ngay trên nút rồi trả lại nhãn ban đầu.
   const old = button.textContent;
   try {
     await navigator.clipboard.writeText(value);

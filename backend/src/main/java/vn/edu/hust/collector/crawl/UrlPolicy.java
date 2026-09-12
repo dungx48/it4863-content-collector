@@ -24,6 +24,7 @@ public class UrlPolicy {
         String path = uri.getRawPath();
         if (path == null || path.isEmpty()) path = "/";
         String query = uri.getRawQuery();
+        // Chỉ bỏ tham số theo dõi; giữ query có thể quyết định nội dung trang.
         if (query != null) query = String.join("&", Arrays.stream(query.split("&"))
             .filter(p -> !p.toLowerCase(Locale.ROOT).matches("(utm_[^=]*|fbclid|gclid)=.*")).toList());
         return scheme + "://" + host + path + (query == null || query.isEmpty() ? "" : "?" + query);
@@ -50,6 +51,7 @@ public class UrlPolicy {
     /** Resolve DNS và từ chối địa chỉ local/private trước khi gửi request. */
     public void checkFetch(String url, String domain) throws UnknownHostException {
         if (!inDomain(url, domain) || !inDomain(url, allowedDomain)) throw new IllegalArgumentException("Outside crawl domain");
+        // Chặn DNS trỏ vào mạng nội bộ trước khi downloader mở kết nối.
         for (InetAddress address : InetAddress.getAllByName(URI.create(url).getHost())) {
             byte[] b = address.getAddress();
             if (address.isAnyLocalAddress() || address.isLoopbackAddress() || address.isLinkLocalAddress() ||

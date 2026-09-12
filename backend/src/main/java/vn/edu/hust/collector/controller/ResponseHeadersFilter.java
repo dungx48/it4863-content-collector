@@ -10,7 +10,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-/** Adds tracing/security headers and rejects known oversized extraction bodies early. */
+/** Thêm header truy vết/bảo vệ và chặn sớm body extract quá lớn. */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ResponseHeadersFilter extends HttpFilter {
@@ -19,10 +19,12 @@ public class ResponseHeadersFilter extends HttpFilter {
     @Override protected void doFilter(HttpServletRequest request, HttpServletResponse response,
                                       FilterChain chain) throws IOException, ServletException {
         response.setHeader("X-Request-Id", UUID.randomUUID().toString());
+        // Mọi response có ID riêng để đối chiếu log và không được browser cache.
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("X-Content-Type-Options", "nosniff");
         if (request.getMethod().equals("POST") && request.getRequestURI().endsWith("/extract")
                 && request.getContentLengthLong() > MAX_REQUEST_BYTES) {
+            // Chỉ chặn sớm khi Content-Length đã biết; proxy/controller vẫn giới hạn body thật.
             byte[] body = "{\"success\":false,\"reason\":\"REQUEST_TOO_LARGE\",\"message\":\"Yêu cầu quá lớn.\"}"
                 .getBytes(StandardCharsets.UTF_8);
             response.setStatus(HttpStatus.PAYLOAD_TOO_LARGE.value());

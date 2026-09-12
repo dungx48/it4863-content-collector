@@ -25,6 +25,7 @@ public final class BatchOutputRepository implements AutoCloseable {
         }
         var opened = new ArrayList<Closeable>();
         try {
+            // JSONL phục vụ xử lý theo dòng; documents.json phục vụ tải và trình diễn.
             documents = writer("documents.jsonl"); opened.add(documents);
             results = writer("results.jsonl"); opened.add(results);
             var arrayWriter = writer("documents.json"); opened.add(arrayWriter);
@@ -45,6 +46,7 @@ public final class BatchOutputRepository implements AutoCloseable {
     }
 
     public void append(CollectionResult result, Document document) throws IOException {
+        // Chỉ KEPT có document; mọi URL đều có một dòng result để truy vết.
         if (document != null) {
             documents.write(json.writeValueAsString(document)); documents.newLine(); documents.flush();
             readable.writeObject(document); readable.flush();
@@ -53,6 +55,7 @@ public final class BatchOutputRepository implements AutoCloseable {
     }
 
     public void finish(BatchSummary summary) throws IOException {
+        // Chỉ đóng mảng và tạo summary khi batch kết thúc bình thường.
         readable.writeEndArray();
         readable.flush();
         json.writerWithDefaultPrettyPrinter().writeValue(directory.resolve("summary.json").toFile(), summary);
