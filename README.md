@@ -4,12 +4,12 @@ Project thực hiện đúng phần **phát triển mã nguồn hỗ trợ thu t
 
 > Link bài viết → tải dữ liệu → bóc tách tiêu đề, nội dung văn bản, liên kết và ảnh đi ra.
 
-Mỗi liên kết/ảnh đi ra gồm URL HTTP(S) đầy đủ và văn bản mô tả. Project chưa triển khai công cụ tìm kiếm, Lucene, database hoặc crawl đệ quy.
+Mỗi liên kết/ảnh đi ra gồm URL HTTP(S) đầy đủ và văn bản mô tả. Dữ liệu thu thập có thể nạp vào màn hình tìm kiếm Lucene/TF-IDF. Project chưa có database, OCR hoặc crawl đệ quy.
 
 ## Kiến trúc
 
 **Một backend duy nhất** trong `backend/`, chia controller, service, repository,
-model, dto và config. Download, parser, whitelist và batch đều chạy trong backend này.
+model, dto và config. Download, parser và batch đều chạy trong backend này.
 Frontend ở `frontend/demo/` chỉ là client trình diễn và chạy riêng trên port 3000.
 
 ```text
@@ -22,14 +22,15 @@ Frontend demo :3000 → HTTP → Backend :8080
 ## Chức năng
 
 - Nhận một URL HUST trên giao diện hoặc CLI.
-- Gợi ý URL từ whitelist `N06_Ctrl+F` gồm 9.516 URL duy nhất.
-- Import file TXT trong trình duyệt, lọc URL HUST và chọn một URL để demo.
+- Import file TXT trong trình duyệt, chọn tối đa 10 URL và bóc tách tuần tự.
 - Chạy batch nhiều URL bằng CLI.
 - Tải có kiểm tra domain, địa chỉ IP, robots.txt, redirect và giới hạn dung lượng.
 - Bóc tách HTML bằng Jsoup; PDF/Office/ODF/RTF bằng Apache Tika.
 - Lấy tiêu đề, văn bản, thẻ liên kết và nguồn ảnh trong vùng bài viết.
 - Chuẩn hóa Unicode tiếng Việt và loại nội dung trùng bằng SHA-256 của text.
 - Xuất JSON dễ đọc, JSONL theo dòng và báo cáo tổng hợp.
+- Xem kết quả trong bảng, mở chi tiết từng bài và tải/copy JSON một bài hoặc cả lô.
+- Nạp file hoặc dán JSON để lập chỉ mục và tìm kiếm Lucene/TF-IDF.
 
 ## Yêu cầu môi trường
 
@@ -85,8 +86,8 @@ Mở http://localhost:3000. API nằm tại http://127.0.0.1:8080; `/health` tr�
 Frontend dùng proxy cùng origin tới backend, không cần CORS. Có thể chỉ chạy backend
 và gọi API bằng client bất kỳ. `--serve` không còn phục vụ giao diện từ JAR.
 
-Demo vẫn hỗ trợ URL trực tiếp, gợi ý whitelist và import TXT trong trình duyệt.
-Import không upload file hoặc tự chạy batch. URL mẫu tự động: http://localhost:3000/?demo=1.
+Demo hỗ trợ URL trực tiếp và import TXT trong trình duyệt. Batch giao diện tiếp tục khi một URL lỗi,
+loại nội dung trùng chính xác và cho tải/sao chép mảng JSON để dùng cho TF-IDF. URL mẫu tự động: http://localhost:3000/?demo=1.
 Dừng từng tiến trình bằng `Ctrl+C`.
 
 ### Docker Compose
@@ -124,12 +125,6 @@ Một file TXT, mỗi dòng có một URL và có thể có dấu phẩy cuối 
 
 ```powershell
 java -jar backend/target/collector.jar --input input.txt --limit 100 --output output/batch-01
-```
-
-Chạy trực tiếp whitelist đã đóng gói trong source:
-
-```powershell
-java -jar backend/target/collector.jar --input "backend/src/main/resources/N06_Ctrl+F.txt" --limit 100 --output output/n06-01
 ```
 
 Các option:
@@ -189,14 +184,14 @@ backend/                     # Một ứng dụng Spring Boot, một JAR/contain
   src/main/java/vn/edu/hust/collector/
     Application.java         # @SpringBootApplication + CLI entry point
     controller/              # Spring MVC, validation, HTTP status
-    service/                 # Thu thập, retry, batch/dedup, whitelist
+    service/                 # Thu thập, retry và batch/dedup
     repository/              # URL nguồn + JSON/JSONL output
     model/                   # Record dữ liệu nghiệp vụ
     dto/                     # API response
     config/                  # Spring beans và health probe
     crawl/                   # URL/IP, robots, HTTP, redirect
     extract/                 # Jsoup/Tika
-  src/main/resources/        # Whitelist, logging; không chứa frontend
+  src/main/resources/        # Cấu hình/logging; không chứa frontend
   src/test/java/
 frontend/demo/               # Giao diện độc lập, không dependency npm
   public/                    # HTML/CSS/JS
@@ -220,6 +215,7 @@ Chi tiết: [backend](backend/README.md), [frontend demo](frontend/demo/README.m
 
 ## Tài liệu
 
+- [Đề xuất OCR ảnh/PDF](docs/ocr-design.md) — thiết kế, chưa triển khai.
 - [Trình diễn tìm kiếm Lucene / TF-IDF](docs/search.md) — mở `/search` trên frontend demo.
 - [Hướng dẫn trình diễn](docs/demo.md)
 - [Thiết kế chi tiết](docs/architecture.md)

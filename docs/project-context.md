@@ -1,6 +1,6 @@
 # Context dự án và hướng dẫn chuyển máy
 
-Cập nhật: 10/09/2026.
+Cập nhật: 12/09/2026.
 
 Một backend Spring Boot duy nhất chứa controller/service/repository/model/dto/config,
 URL policy, HTTP downloader và parser. Frontend demo riêng, không nằm trong JAR.
@@ -23,7 +23,7 @@ node frontend/demo/server.mjs
 
 Giao diện: http://localhost:3000. API: http://127.0.0.1:8080/health.
 Có thể build backend riêng: `mvn -f backend/pom.xml clean verify`.
-Frontend không cần npm install. Test: `node --test frontend/demo/server.test.mjs`.
+Frontend không cần npm install. Test trên Windows: `npm.cmd --prefix frontend/demo test`.
 
 Để debug backend, mở root Maven project trong IntelliJ, reload Maven và debug
 `vn.edu.hust.collector.Application`. Chạy frontend riêng bằng lệnh Node ở terminal VS Code.
@@ -65,7 +65,14 @@ loopback; trong container, ứng dụng bind `0.0.0.0`.
 
 Output vẫn là documents.json, documents.jsonl, results.jsonl, summary.json.
 CLI yêu cầu thư mục output mới; HTTP không ghi output. Batch chạy không cần
-server hoặc frontend. Whitelist được đóng gói trong backend resources.
+server hoặc frontend.
 
 Đọc tiếp: [API](api.md), [kiến trúc](architecture.md), [demo](demo.md),
 [kiểm thử](validation.md). `.tools/` và `.cache/` không thuộc source cần chuyển máy.
+
+## Trạng thái giao diện hiện tại
+
+Thu thập có import TXT, batch tối đa 10 URL, bảng cuộn và hộp thoại chi tiết.
+Có tải/copy JSON cả lô hoặc từng bài. TF-IDF nhận file hoặc JSON dán trực tiếp.
+Kết quả thu thập chỉ nằm trong trình duyệt; chỉ mục Lucene lưu trên đĩa.
+OCR ảnh/PDF liên kết mới là [đề xuất thiết kế](ocr-design.md), chưa triển khai.

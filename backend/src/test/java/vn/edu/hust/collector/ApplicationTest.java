@@ -41,6 +41,7 @@ class ApplicationTest {
         assertThat(get("/health").statusCode()).isEqualTo(200);
         assertThat(get("/").statusCode()).isEqualTo(404);
         assertThat(get("/app.js").statusCode()).isEqualTo(404);
+        assertThat(get("/api/v1/whitelist?q=soict").statusCode()).isEqualTo(404);
 
         var response = post("{\"url\":\"https://soict.hust.edu.vn/article.html\"}");
         assertThat(response.statusCode()).isEqualTo(200);
@@ -52,18 +53,6 @@ class ApplicationTest {
             .isEqualTo("https://soict.hust.edu.vn/files/notice.pdf");
         assertThat(body.path("links").get(1).path("url").asText())
             .isEqualTo("https://soict.hust.edu.vn/images/scholarship.jpg");
-    }
-
-    @Test void servesVersionedAndLegacyWhitelistEndpoints() throws Exception {
-        for (String path : new String[]{"/api/v1/whitelist?q=soict", "/api/whitelist?q=soict"}) {
-            var response = get(path);
-            assertThat(response.statusCode()).isEqualTo(200);
-            var body = json.readTree(response.body());
-            assertThat(body.path("total").asInt()).isGreaterThan(9_000);
-            assertThat(body.path("urls").size()).isPositive();
-            body.path("urls").forEach(node -> assertThat(node.asText()).containsIgnoringCase("soict"));
-        }
-        assertThat(get("/api/v1/whitelist?q=" + "a".repeat(301)).statusCode()).isEqualTo(400);
     }
 
     @Test void rejectsInvalidRequestsWithoutDownloading() throws Exception {

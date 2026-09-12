@@ -10,7 +10,10 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/"><span class="brand-mark">C<span>+</span>F</span><span><strong>Ctrl+F</strong><small>Nhóm N06 · IT4863</small></span></a>
-    <nav aria-label="Màn hình demo"><a href="/">Thu thập</a> · <a href="/search" aria-current="page">Tìm kiếm TF-IDF</a></nav>
+    <nav class="screen-nav" aria-label="Màn hình demo">
+      <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"/></svg>Thu thập</a>
+      <a href="/search" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>Tìm kiếm TF-IDF</a>
+    </nav>
   </header>
   <main>
     <section class="hero">
@@ -22,14 +25,16 @@
     <section class="search-panel" aria-labelledby="index-heading">
       <p class="eyebrow">BƯỚC 01</p>
       <h2 id="index-heading">Chuẩn bị tập văn bản</h2>
-      <p>Dùng file <code>documents.json</code> hoặc <code>documents.pretty.json</code> từ collector. Mảng JSON cần trường <code>text</code>; có thể thêm <code>id</code>, <code>title</code>, <code>url</code>. Tối đa 20 MiB / 10.000 văn bản.</p>
+      <p>Chọn file JSON hoặc dán JSON từ màn hình thu thập. Mỗi văn bản cần trường <code>text</code>; có thể thêm <code>id</code>, <code>title</code>, <code>url</code>. Tối đa 20 MiB / 10.000 văn bản.</p>
       <div class="search-actions">
         <label for="corpus">Chọn file JSON</label>
         <input id="corpus" type="file" accept=".json,application/json">
         <button id="sample" type="button">Dùng dữ liệu mẫu</button>
         <a href="/sample-documents.json" download>Tải JSON mẫu</a>
       </div>
-      <p id="corpus-preview" class="hint">Chưa chọn tập văn bản. Bộ mẫu gồm 6 văn bản tự soạn để minh họa xếp hạng.</p>
+      <label for="corpus-text">Hoặc dán nội dung JSON</label>
+      <textarea id="corpus-text" rows="9" spellcheck="false" placeholder='Dán {"text":"..."} hoặc [{"text":"..."}]'></textarea>
+      <p id="corpus-preview" class="hint" aria-live="polite">Chưa chọn tập văn bản. Bộ mẫu gồm 6 văn bản tự soạn để minh họa xếp hạng.</p>
       <p class="hint">Tạo chỉ mục sẽ thay thế toàn bộ tập văn bản đã lập chỉ mục trước đó.</p>
       <button id="build-index" type="button" disabled>Tạo chỉ mục</button>
       <p id="index-state" role="status">Đang kiểm tra chỉ mục…</p>
@@ -65,6 +70,6 @@
     </details>
   </main>
   <footer><span>Đại học Bách khoa Hà Nội</span><span>Spring Boot · Apache Lucene · TF-IDF</span></footer>
-  <script src="/search.js" defer></script>
+  <script src="/search.js" type="module"></script>
 </body>
 </html>

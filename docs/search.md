@@ -22,12 +22,26 @@ Mở http://localhost:3000/search:
 6. Tắt/bật backend: chỉ mục vẫn còn. Chọn tập JSON khác và tạo lại sẽ thay thế cả tập trước.
 
 Tại màn hình thu thập, sau khi bóc tách có thể bấm **Tải JSON để tìm kiếm**.
-File tải xuống là mảng một văn bản, nạp được ngay ở màn hình tìm kiếm.
-Để có nhiều văn bản, dùng `documents.json` xuất từ batch collector.
+File `documents.json` chứa các bài thành công không trùng của lượt vừa chạy.
+Trong chi tiết, **Tải JSON bài này** xuất `document.json`, mảng một bài.
+Cả hai nạp được ngay ở màn hình tìm kiếm; có thể dùng nút sao chép rồi dán vào ô JSON.
+
+### Dán JSON hoặc chọn file
+
+1. Chọn file JSON, dùng bộ mẫu hoặc dán nội dung vào ô JSON.
+2. Khi đổi nguồn, lựa chọn trước đó bị bỏ; chưa thay đổi chỉ mục hiện tại.
+3. Bấm **Tạo chỉ mục**. JSON dán được kiểm tra ở bước này, không parse mỗi lần gõ.
+4. JSON sai cú pháp, thiếu `text` hoặc vượt giới hạn sẽ báo lỗi và không gửi tạo chỉ mục.
+5. Sau khi tạo thành công, nhập truy vấn rồi bấm **Tìm kiếm**.
+
+Frontend nhận một object `{ "text": "Nội dung" }` hoặc mảng object và chuyển thành
+mảng trước khi gọi API. File được kiểm tra ngay khi đọc; nội dung dán kiểm tra khi
+bấm tạo chỉ mục. Không tự sửa JSON sai. Tạo chỉ mục mới thay thế toàn bộ tập cũ,
+không tự nối thêm văn bản.
 
 ## Đầu vào và đầu ra
 
-JSON UTF-8 phải là mảng 1–10.000 object, tổng request tối đa 20 MiB:
+API nhận JSON UTF-8 là mảng 1–10.000 object, tổng request tối đa 20 MiB:
 
 ```json
 [
@@ -40,7 +54,7 @@ JSON UTF-8 phải là mảng 1–10.000 object, tổng request tối đa 20 MiB:
 - `title` tùy chọn, tối đa 2.000 ký tự; `url` tùy chọn, tối đa 8.192 ký tự.
 - `id` tùy chọn, chuỗi tối đa 200 ký tự; thiếu thì dùng `doc-1`, `doc-2`… theo vị trí. ID cuối cùng phải duy nhất.
 - Các trường collector khác như `links`, `contentHash`, `fetchedAt` được bỏ qua khi lập chỉ mục.
-- Không nhận JSONL, object bao ngoài hoặc văn bản không có token. Dùng file mảng `documents.json` / `documents.pretty.json`.
+- Không nhận JSONL, object bao ngoài kiểu `{ "documents": [...] }` hoặc văn bản không có token. Frontend có thể bọc một object văn bản thành mảng; gọi API trực tiếp phải gửi mảng.
 - Toàn bộ dữ liệu được kiểm tra trước khi ghi. Ghi bằng transaction Lucene và rollback khi lỗi trước commit, không công bố một phần chỉ mục.
 
 Đầu ra chỉ mục là các file Lucene trong `data/lucene-index`, tính từ working directory của backend.

@@ -24,6 +24,7 @@ test('serves standalone demo and proxies API payload/status to a separately runn
   const page = await fetch(demo);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /Link bài viết/);
+  assert.match(await (await fetch(`${demo}/batch.mjs`)).text(), /collectBatch/);
   const payload = JSON.stringify({ url: 'https://hust.edu.vn/a' });
   const response = await fetch(`${demo}/api/v1/extract`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
@@ -33,6 +34,7 @@ test('serves standalone demo and proxies API payload/status to a separately runn
   assert.equal((await response.json()).reason, 'SHORT_OR_LINK_LIST');
   assert.deepEqual(received, [{ path: '/api/v1/extract', method: 'POST', body: payload }]);
   assert.equal((await fetch(`${demo}/server.mjs`)).status, 404);
+  assert.equal((await fetch(`${demo}/api/v1/whitelist?q=soict`)).status, 404);
   assert.equal((await fetch(`${demo}/api/v1/extract`)).status, 405);
   assert.equal((await fetch(`${demo}/api/v1/extract`, { method: 'POST', body: 'x'.repeat(8193) })).status, 413);
   assert.equal(received.length, 1);
@@ -46,7 +48,7 @@ test('demo stays available while backend is down', async t => {
   await new Promise(resolve => unavailable.close(resolve));
   const demo = await start(createDemoServer(`http://127.0.0.1:${port}`), t);
   assert.equal((await fetch(demo)).status, 200);
-  assert.equal((await fetch(`${demo}/api/v1/whitelist`)).status, 502);
+  assert.equal((await fetch(`${demo}/api/v1/index`)).status, 502);
 });
 
 test('search page and JSON import proxy support larger corpora without raising extraction limit', async t => {
@@ -60,6 +62,7 @@ test('search page and JSON import proxy support larger corpora without raising e
   }), t);
   const demo = await start(createDemoServer(backend), t);
   assert.match(await (await fetch(`${demo}/search`)).text(), /Tìm kiếm văn bản/);
+  assert.match(await (await fetch(`${demo}/corpus.mjs`)).text(), /normalizeCorpus/);
   assert.equal((await (await fetch(`${demo}/sample-documents.json`)).json()).length, 6);
   const payload = JSON.stringify([{ text: 'lucene '.repeat(2000) }]);
   assert.equal((await fetch(`${demo}/api/v1/index`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })).status, 200);

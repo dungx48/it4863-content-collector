@@ -14,24 +14,25 @@
       <span class="brand-mark">C<span>+</span>F</span>
       <span><strong>Ctrl+F</strong><small>Nhóm N06 · IT4863</small></span>
     </a>
-    <nav aria-label="Màn hình demo"><a href="/" aria-current="page">Thu thập</a> · <a href="/search">Tìm kiếm TF-IDF →</a></nav>
+    <nav class="screen-nav" aria-label="Màn hình demo">
+      <a href="/" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"/></svg>Thu thập</a>
+      <a href="/search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>Tìm kiếm TF-IDF</a>
+    </nav>
   </header>
 
   <main>
-    <!-- Nhập trực tiếp, chọn whitelist hoặc import TXT. -->
+    <!-- Nhập trực tiếp hoặc import TXT. -->
     <section class="hero">
       <p class="eyebrow">TRÌNH DIỄN THU THẬP DỮ LIỆU</p>
-      <h1>Từ một đường link<br><em>đến nội dung sạch.</em></h1>
-      <p class="lead">Nhập link bài viết thuộc <strong>hust.edu.vn</strong>. Hệ thống tải trang và bóc tách tiêu đề, nội dung văn bản cùng các liên kết và ảnh đi ra.</p>
+      <h1>Từ đường link<br><em>đến nội dung sạch.</em></h1>
+      <p class="lead">Nhập một link hoặc import danh sách bài viết thuộc <strong>hust.edu.vn</strong>. Hệ thống tải trang và bóc tách tiêu đề, nội dung văn bản cùng các liên kết và ảnh đi ra.</p>
 
       <form id="extract-form" class="url-form">
         <label for="url">Link bài viết</label>
         <div class="input-row">
           <span class="link-icon" aria-hidden="true">↗</span>
           <input id="url" name="url" type="url" required autocomplete="url"
-                 list="whitelist-suggestions"
-                 placeholder="Gõ tên miền hoặc đường dẫn để xem gợi ý">
-          <datalist id="whitelist-suggestions"></datalist>
+                 placeholder="https://soict.hust.edu.vn/bai-viet.html">
           <button id="submit" type="submit">
             <span class="button-label">Bóc tách</span>
             <span class="spinner" aria-hidden="true"></span>
@@ -41,7 +42,6 @@
           <button class="example" id="example" type="button">Dùng link bài viết mẫu</button>
           <label class="file-action" for="txt-import">Import danh sách .txt</label>
           <input id="txt-import" type="file" accept=".txt,text/plain" hidden>
-          <span id="whitelist-status" class="source-status">Gõ để tìm trong whitelist N06_Ctrl+F</span>
         </div>
 
         <section id="import-panel" class="import-panel" hidden>
@@ -51,25 +51,48 @@
           </div>
           <label for="import-filter">Tìm trong file</label>
           <input id="import-filter" type="search" placeholder="Lọc theo tên miền hoặc đường dẫn">
-          <select id="imported-urls" size="6" aria-label="Các URL đã import"></select>
+          <div class="selection-heading"><span id="selected-count">Đã chọn 0/10</span><button id="clear-selection" type="button" disabled>Bỏ chọn tất cả</button></div>
+          <div id="imported-urls" class="imported-urls" role="group" aria-label="Các URL đã import"></div>
           <p id="import-note" class="import-note"></p>
+          <div class="batch-actions">
+            <button id="batch-submit" type="button" disabled>Bóc tách các URL đã chọn</button>
+            <button id="batch-stop" type="button" hidden>Dừng</button>
+          </div>
         </section>
       </form>
     </section>
 
     <section id="status" class="status" hidden aria-live="polite"></section>
 
-    <!-- Ba nhóm dữ liệu đúng theo yêu cầu bài tập. -->
-    <section id="result" class="result" hidden>
+    <section id="batch-results" class="batch-results" hidden aria-labelledby="batch-heading">
+      <div class="result-heading">
+        <div><p class="eyebrow">TIẾN ĐỘ BÓC TÁCH</p><h2 id="batch-heading">Kết quả theo lô</h2></div>
+        <p id="batch-progress" role="status" aria-live="polite"></p>
+      </div>
+      <div class="table-wrap">
+        <table class="batch-table"><thead><tr><th>Trạng thái</th><th>Bài viết / lỗi</th><th>Nguồn</th><th>Chi tiết</th></tr></thead><tbody id="batch-rows"></tbody></table>
+      </div>
+    </section>
+
+    <section id="export-results" class="export-results" hidden aria-label="Xuất kết quả">
+      <span id="export-count"></span>
+      <button id="download-json" class="secondary" type="button">Tải JSON để tìm kiếm</button>
+      <button id="copy-json" class="secondary" type="button">Sao chép JSON</button>
+    </section>
+
+    <dialog id="result" class="result" aria-labelledby="detail-heading">
       <div class="result-heading">
         <div>
           <p class="eyebrow">DỮ LIỆU BÓC TÁCH ĐƯỢC</p>
-          <h2>Kết quả thu thập</h2>
+          <h2 id="detail-heading">Chi tiết bài viết</h2>
         </div>
-        <div><button id="download-json" class="secondary" type="button">Tải JSON để tìm kiếm</button>
-        <button id="copy-json" class="secondary" type="button">Sao chép JSON</button></div>
+        <form method="dialog"><button class="secondary" autofocus>Đóng</button></form>
       </div>
 
+      <div class="detail-actions">
+        <button id="download-detail-json" class="secondary" type="button">Tải JSON bài này</button>
+        <button id="copy-detail-json" class="secondary" type="button">Sao chép JSON bài này</button>
+      </div>
       <div class="metrics">
         <div><span>HTTP</span><strong id="http-status">—</strong></div>
         <div><span>Định dạng</span><strong id="content-type">—</strong></div>
@@ -98,13 +121,15 @@
         </div>
       </article>
 
+      <details class="detail-links">
+        <summary>Liên kết và ảnh đi ra</summary>
       <article class="card">
         <div class="card-number">03</div>
         <div class="card-body">
           <h3>Các liên kết đi ra</h3>
           <p class="hint">URL đầy đủ và văn bản mô tả của liên kết và ảnh trong vùng nội dung bài viết.</p>
           <div class="table-wrap">
-            <table>
+            <table id="links-table">
               <thead><tr><th>Văn bản mô tả</th><th>URL đầy đủ</th></tr></thead>
               <tbody id="links"></tbody>
             </table>
@@ -112,10 +137,11 @@
           </div>
         </div>
       </article>
-    </section>
+      </details>
+    </dialog>
   </main>
 
   <footer><span>Đại học Bách khoa Hà Nội</span><span>Java 21 · Jsoup · Apache Tika</span></footer>
-  <script src="/app.js" defer></script>
+  <script src="/app.js" type="module"></script>
 </body>
 </html>

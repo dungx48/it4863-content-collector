@@ -3,8 +3,7 @@
 API tạo chỉ mục và tìm kiếm TF-IDF: [search.md](search.md).
 
 Backend mặc định: `http://127.0.0.1:8080`. Không phục vụ HTML, CSS hoặc JavaScript.
-Frontend demo là client riêng tại port 3000. Endpoint cũ `/api/extract` và
-`/api/whitelist` vẫn là alias để giữ tương thích.
+Frontend demo là client riêng tại port 3000. Endpoint cũ `/api/extract` vẫn là alias để giữ tương thích.
 
 ## Health
 
@@ -41,17 +40,6 @@ HTTP 200:
 
 URL trả về là đích cuối sau redirect. `links` chứa hyperlink và ảnh HTTP(S) trong
 vùng bài viết. API không lưu document xuống disk; lưu JSON/JSONL thuộc CLI batch.
-
-## Whitelist
-
-`GET /api/v1/whitelist?q=soict` → HTTP 200:
-
-```json
-{"success":true,"total":9516,"urls":["https://soict.hust.edu.vn/"]}
-```
-
-Ví dụ minh họa; URL thực tế tùy dữ liệu whitelist. Tối đa 20 kết quả, tìm không
-phân biệt hoa/thường. `q` tối đa 300 ký tự sau strip, có thể để trống.
 
 ## Lỗi
 

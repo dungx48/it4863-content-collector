@@ -8,7 +8,7 @@ src/main/java/vn/edu/hust/collector/
   config/                # Spring beans + health probe
   controller/            # Spring MVC, validation và xử lý lỗi
   dto/                   # API response
-  service/               # Thu thập, retry, batch/dedup, whitelist
+  service/               # Thu thập, retry và batch/dedup
   repository/            # Đọc URL + ghi output JSON/JSONL
   model/                 # Dữ liệu thu thập/kết quả batch
   crawl/                 # HTTP, robots, URL/IP policy
@@ -27,7 +27,7 @@ Trong IntelliJ, reload Maven rồi debug trực tiếp class `Application`. Khô
 
 Mặc định API lắng nghe `127.0.0.1:8080`. Cấu hình bằng `SERVER_HOST`, `SERVER_PORT`,
 hoặc ghi đè port bằng `--serve 8081`. Actuator `/health` trả trạng thái tiến trình;
-`POST /api/v1/extract` thu thập một URL; `GET /api/v1/whitelist?q=soict` tìm gợi ý.
+`POST /api/v1/extract` thu thập một URL.
 
 CLI cùng nghiệp vụ, không yêu cầu HTTP server hoặc frontend đang chạy:
 

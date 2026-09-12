@@ -69,7 +69,7 @@ public class Application {
             IT4863 - Public HUST content collector
             java -jar backend/target/collector.jar --serve 8080
             java -jar backend/target/collector.jar --url https://hust.edu.vn/example.html
-            java -jar backend/target/collector.jar --input N06_Ctrl+F --limit 100 --output output/sample
+            java -jar backend/target/collector.jar --input urls.txt --limit 100 --output output/sample
 
             --url      Process one URL (mutually exclusive with --input).
             --input    UTF-8 URL list; N06 headers and trailing commas are handled.

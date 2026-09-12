@@ -22,8 +22,6 @@ flowchart LR
       Controller[CollectionController] --> Service[CollectionService]
       CLI[Application CLI] --> Batch[BatchService]
       Batch --> Service
-      Controller --> White[WhitelistService]
-      White --> URLs[UrlListRepository]
       Batch --> Output[BatchOutputRepository]
       Service --> Download[DownloadService / Fetcher / UrlPolicy]
       Service --> Parser[ContentExtractor]
@@ -48,8 +46,7 @@ entry point và health check riêng. Demo nằm trong profile Compose `demo` tù
 | `service/CollectionService` | Policy đầu vào và pipeline download/parser dùng chung |
 | `service/DownloadService` | Retry I/O/429/5xx quanh Fetcher |
 | `service/BatchService` | Vòng lặp URL, dedup URL/text, status và summary |
-| `service/WhitelistService` | Tìm tối đa 20 gợi ý trong whitelist |
-| `repository/UrlListRepository` | Đọc whitelist classpath và file TXT batch |
+| `repository/UrlListRepository` | Đọc file TXT batch |
 | `repository/BatchOutputRepository` | Mở output mới, serialize, flush và đóng tài nguyên |
 | `model` | Link, FetchedContent, ExtractedContent, Document, CollectionResult, BatchSummary, CollectionOutcome |
 | `crawl` | HTTP/robots/redirect/giới hạn tải và URL/IP policy |
@@ -83,12 +80,12 @@ Ngoài nhánh đặc biệt `--serve [port]`, CLI nhận cặp option/value, t�
 Backend mặc định bind loopback, có thể cấu hình host/port bằng environment.
 `CollectionController` chỉ xử lý JSON và gọi service, không đọc resource UI.
 Spring MVC nhận request; semaphore giới hạn một request thu thập đang chạy, request tiếp theo
-nhận HTTP 429 thay vì chờ vô hạn. Actuator health và whitelist vẫn phục vụ đồng thời.
+nhận HTTP 429 thay vì chờ vô hạn. Actuator health vẫn phục vụ đồng thời.
 `CollectionService` đồng bộ truy cập Fetcher/parser để giữ an toàn cache theo host.
 
 Endpoint, status, validation và compatibility alias được mô tả tại [api.md](api.md).
 Frontend là client tùy chọn trong `frontend/demo`; Node chỉ serve static/proxy API.
-TXT import vẫn được đọc trong trình duyệt, không upload hoặc tự chạy batch.
+TXT import được đọc trong trình duyệt, không upload. Giao diện cho chọn tối đa 10 URL và gọi tuần tự API bóc tách đơn; batch CLI vẫn dành cho lô lớn và output bền vững trên disk.
 
 ### Đọc input CLI
 
@@ -270,7 +267,7 @@ Nếu ngắt giữa hai lần ghi, document có thể chưa có result tương �
 
 Lỗi từng URL thường được đổi thành Result để tiếp tục. Batch có FAILED vẫn có thể exit code 0. `Application.main` chỉ gọi `System.exit(1)` khi có exception thoát ra ngoài như lỗi tham số/input/output. Script tự động phải đọc summary nếu muốn xem lỗi từng URL là job thất bại.
 
-Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời điểm request theo host. Byte tài nguyên được giữ trong RAM để parse; không lưu raw HTML/PDF. Batch chạy tuần tự; API giới hạn một request thu thập và vẫn phục vụ health/whitelist đồng thời.
+Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời điểm request theo host. Byte tài nguyên được giữ trong RAM để parse; không lưu raw HTML/PDF. Batch chạy tuần tự; API giới hạn một request thu thập và vẫn phục vụ health đồng thời.
 
 ## 11. Mẫu thực tế đã commit
 
@@ -297,7 +294,7 @@ Trạng thái RAM gồm List input, tập URL/hash, cache robots và thời đi�
 | Robots, redirect, size, delay | Fetcher | FetcherTest với server cục bộ |
 | Vùng nội dung, ngưỡng giữ/bỏ | ContentExtractor | ContentExtractorTest và HTML có nhãn |
 | Loại tài liệu mới | Allowlist extractor, dependency nếu cần | Fixture định dạng đó và JAR đóng gói |
-| Whitelist, import TXT, giao diện/API | CollectionController, WhitelistService và `frontend/demo/` | ApplicationTest, `node --check` và smoke test trình duyệt |
+| Import TXT, giao diện/API | CollectionController, UrlListRepository và `frontend/demo/` | ApplicationTest, `node --check` và smoke test trình duyệt |
 
 Hướng mở rộng đề xuất, **chưa triển khai**: đánh giá mẫu nhiều subdomain/định dạng trước khi chỉnh heuristic; thêm test retry/lỗi; manifest lần chạy/schema version nếu cần tái lập; checkpoint/raw storage nếu chạy dài. Tìm kiếm Lucene/TF-IDF đã được triển khai, xem [search.md](search.md). Sửa normalization sẽ ảnh hưởng hash/dedup nên cần đánh giá lại mẫu.
 

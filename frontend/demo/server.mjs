@@ -5,13 +5,15 @@ import { pathToFileURL } from 'node:url';
 const files = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+  ['/batch.mjs', ['batch.mjs', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/search', ['search.html', 'text/html; charset=utf-8']],
   ['/search.js', ['search.js', 'text/javascript; charset=utf-8']],
+  ['/corpus.mjs', ['corpus.mjs', 'text/javascript; charset=utf-8']],
   ['/search.css', ['search.css', 'text/css; charset=utf-8']],
   ['/sample-documents.json', ['sample-documents.json', 'application/json; charset=utf-8']],
 ]);
-const apiPaths = new Set(['/api/v1/extract', '/api/v1/whitelist', '/api/v1/index', '/api/v1/search']);
+const apiPaths = new Set(['/api/v1/extract', '/api/v1/index', '/api/v1/search']);
 
 function jsonError(response, status, message) {
   response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });

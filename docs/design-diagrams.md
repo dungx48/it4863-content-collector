@@ -23,8 +23,6 @@ profile `demo` để bật giao diện khi trình diễn.
 flowchart TD
   App[Spring Boot Application + config] --> Controller[Spring MVC CollectionController]
   Controller --> Collection[CollectionService]
-  Controller --> White[WhitelistService]
-  White --> URLRepo[UrlListRepository]
   App --> Batch[BatchService]
   Batch --> Collection
   Batch --> Output[BatchOutputRepository]

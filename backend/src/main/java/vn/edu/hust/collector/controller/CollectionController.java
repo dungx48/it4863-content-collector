@@ -1,9 +1,7 @@
 package vn.edu.hust.collector.controller;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Size;
 import org.springframework.http.*;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import vn.edu.hust.collector.dto.*;
 import vn.edu.hust.collector.exception.*;
@@ -11,20 +9,11 @@ import vn.edu.hust.collector.service.*;
 
 /** Spring MVC adapter: validates HTTP input and maps service results to the API contract. */
 @RestController
-@Validated
 public class CollectionController {
     private final CollectionService collection;
-    private final WhitelistService whitelist;
 
-    public CollectionController(CollectionService collection, WhitelistService whitelist) {
+    public CollectionController(CollectionService collection) {
         this.collection = collection;
-        this.whitelist = whitelist;
-    }
-
-    @GetMapping({"/api/v1/whitelist", "/api/whitelist"})
-    public WhitelistResponse suggestions(
-            @RequestParam(defaultValue = "") @Size(max = 300) String q) {
-        return new WhitelistResponse(true, whitelist.total(), whitelist.search(q));
     }
 
     @PostMapping(

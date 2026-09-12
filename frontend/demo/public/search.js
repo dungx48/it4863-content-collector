@@ -1,3 +1,5 @@
+import { normalizeCorpus } from './corpus.mjs';
+
 const $ = selector => document.querySelector(selector);
 let corpus = null;
 let ready = false;
@@ -11,10 +13,11 @@ function message(text, error = false) {
 }
 function controls(value) {
   busy = value;
-  $('#build-index').disabled = busy || !corpus;
+  $('#build-index').disabled = busy || (!corpus && !$('#corpus-text').value.trim());
   $('#search-button').disabled = busy || !ready;
   $('#sample').disabled = busy;
   $('#corpus').disabled = busy;
+  $('#corpus-text').disabled = busy;
   document.querySelectorAll('[data-query]').forEach(button => { button.disabled = busy; });
 }
 async function api(path, options = {}) {
@@ -30,37 +33,52 @@ function renderIndex(data) {
     : 'Chưa có chỉ mục. Chọn JSON rồi bấm Tạo chỉ mục.';
   controls(busy);
 }
-async function selectCorpus(text, name, version) {
+function preview(text, error = false) {
+  $('#corpus-preview').textContent = text;
+  $('#corpus-preview').className = error ? 'hint error-text' : 'hint';
+}
+function selectCorpus(text, name, version) {
+  // Bỏ kết quả đọc cũ nếu người dùng đã đổi nguồn dữ liệu.
   if (version !== selectionVersion) return;
   corpus = null;
   controls(false);
   try {
-    if (new TextEncoder().encode(text).length > MAX_BYTES) throw new Error('File vượt quá 20 MiB.');
-    const data = JSON.parse(text.replace(/^\uFEFF/, ''));
-    if (!Array.isArray(data) || !data.length || data.length > 10000)
-      throw new Error('Cần mảng JSON gồm 1–10.000 văn bản.');
-    if (data.some(doc => !doc || typeof doc.text !== 'string' || !doc.text.trim()))
-      throw new Error('Mỗi văn bản cần trường text là chuỗi không rỗng.');
-    corpus = JSON.stringify(data);
-    $('#corpus-preview').textContent = name + ' · ' + data.length + ' văn bản · Chưa tạo chỉ mục từ file này.';
+    const normalized = normalizeCorpus(text, MAX_BYTES);
+    corpus = normalized.json;
+    preview(name + ' · ' + normalized.count + ' văn bản · Chưa tạo chỉ mục từ dữ liệu này.');
     message('Dữ liệu đã sẵn sàng. Bấm Tạo chỉ mục để sử dụng.');
+    controls(false);
+    return true;
   } catch (error) {
-    $('#corpus-preview').textContent = 'Tập văn bản không hợp lệ.';
+    preview(error.message, true);
     message(error.message, true);
+    controls(false);
+    return false;
   }
-  controls(false);
 }
 $('#corpus').addEventListener('change', async event => {
   const version = ++selectionVersion;
   corpus = null;
+  $('#corpus-text').value = '';
   controls(false);
   const file = event.target.files[0];
-  if (!file) { $('#corpus-preview').textContent = 'Chưa chọn tập văn bản.'; return; }
+  if (!file) { preview('Chưa chọn tập văn bản.'); return; }
   try {
     if (file.size > MAX_BYTES) throw new Error('File vượt quá 20 MiB.');
     controls(true);
-    await selectCorpus(await file.text(), file.name, version);
-  } catch (error) { message(error.message, true); controls(false); }
+    selectCorpus(await file.text(), file.name, version);
+  } catch (error) { preview(error.message, true); message(error.message, true); controls(false); }
+});
+$('#corpus-text').addEventListener('input', () => {
+  // Chỉ kiểm tra JSON khi bấm tạo chỉ mục, tránh parse mỗi lần gõ.
+  ++selectionVersion;
+  corpus = null;
+  $('#corpus').value = '';
+  preview($('#corpus-text').value.trim()
+    ? 'Đã nhập JSON. Nội dung sẽ được kiểm tra khi tạo chỉ mục.'
+    : 'Chưa chọn tập văn bản.');
+  message('');
+  controls(false);
 });
 $('#sample').addEventListener('click', async () => {
   const version = ++selectionVersion;
@@ -70,17 +88,21 @@ $('#sample').addEventListener('click', async () => {
     const response = await fetch('/sample-documents.json');
     if (!response.ok) throw new Error('Không tải được dữ liệu mẫu.');
     $('#corpus').value = '';
-    await selectCorpus(await response.text(), 'Bộ mẫu minh họa TF-IDF (tự soạn)', version);
+    $('#corpus-text').value = '';
+    selectCorpus(await response.text(), 'Bộ mẫu minh họa TF-IDF (tự soạn)', version);
   } catch (error) { message(error.message, true); controls(false); }
 });
 $('#build-index').addEventListener('click', async () => {
-  if (!corpus || busy) return;
+  if (busy) return;
+  const pasted = $('#corpus-text').value.trim();
+  if (pasted && !selectCorpus(pasted, 'Nội dung JSON đã dán', selectionVersion)) return;
+  if (!corpus) return;
   controls(true);
   message('Đang tạo chỉ mục…');
   $('#search-results').hidden = true;
   try {
     renderIndex(await api('/api/v1/index', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: corpus }));
-    $('#corpus-preview').textContent = $('#corpus-preview').textContent.replace('Chưa tạo chỉ mục từ file này.', 'Đã tạo chỉ mục từ tập văn bản này.');
+    preview($('#corpus-preview').textContent.replace('Chưa tạo chỉ mục từ dữ liệu này.', 'Đã tạo chỉ mục từ tập văn bản này.'));
     message('Tạo chỉ mục thành công. Nhập truy vấn để tìm kiếm.');
     $('#query').focus();
   } catch (error) { message(error.message, true); }

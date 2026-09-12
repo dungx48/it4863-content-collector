@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 class BatchServiceTest {
     @TempDir Path temporary;
     @Test void importsN06AndExportsDecisionsWithoutFetchingDuplicateUrls() throws Exception {
-        Path input=temporary.resolve("N06_Ctrl+F");
+        Path input=temporary.resolve("urls.txt");
         Files.writeString(input,"\uFEFFNhóm N06\nThành viên:\nhttps://hust.edu.vn/a,\nhttps://hust.edu.vn/a\nhttps://hust.edu.vn/b\nhttps://hust.edu.vn/missing\nhttps://asso.hust.edu.vn/adfs/ls/\nhttps://other.test/\n");
         var requests=new AtomicInteger();
         var collector=batch(new UrlPolicy("hust.edu.vn"),url -> {
