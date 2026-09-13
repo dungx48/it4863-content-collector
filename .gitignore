@@ -4,6 +4,7 @@
 **/target/
 **/node_modules/
 archive/
+/bt/
 output/*
 !output/demo-input.txt
 !output/demo-n06/

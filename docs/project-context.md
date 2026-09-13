@@ -76,3 +76,6 @@ Thu thập có import TXT, batch tối đa 10 URL, bảng cuộn và hộp tho�
 Có tải/copy JSON cả lô hoặc từng bài. TF-IDF nhận file hoặc JSON dán trực tiếp.
 Kết quả thu thập chỉ nằm trong trình duyệt; chỉ mục Lucene lưu trên đĩa.
 OCR ảnh/PDF liên kết mới là [đề xuất thiết kế](ocr-design.md), chưa triển khai.
+
+Các yêu cầu crawler giảng viên góp ý (robots, tần suất, bẫy thu thập, resume)
+đã ghi tại [backlog crawler](crawler-backlog.md), để bố trí triển khai sau.
