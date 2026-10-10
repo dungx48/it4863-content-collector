@@ -46,12 +46,16 @@ public class SearchService {
     }
 
     public SearchResponse search(String query, int limit) throws IOException {
+        return search(query, limit, SearchOptions.defaults());
+    }
+
+    public SearchResponse search(String query, int limit, SearchOptions options) throws IOException {
         // Analyzer của repository được dùng chung cho corpus và truy vấn.
         if (query == null || query.isBlank() || query.length() > 500 || limit < 1 || limit > 50)
             throw ApiException.badRequest("INVALID_QUERY", "Truy vấn cần 1–500 ký tự; số kết quả từ 1 đến 50.");
         var tokens = LuceneIndexRepository.tokens(query);
         if (tokens.isEmpty()) throw ApiException.badRequest("INVALID_QUERY", "Truy vấn không có từ để tìm kiếm.");
-        return repository.search(query.strip(), tokens, limit);
+        return repository.search(query.strip(), tokens, limit, options);
     }
 
     private String field(JsonNode node, String key, boolean required, int max) {

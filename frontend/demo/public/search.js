@@ -19,6 +19,7 @@ function controls(value) {
   $('#sample').disabled = busy;
   $('#corpus').disabled = busy;
   $('#corpus-text').disabled = busy;
+  updateSettings();
   document.querySelectorAll('[data-query]').forEach(button => { button.disabled = busy; });
 }
 async function api(path, options = {}) {
@@ -32,7 +33,7 @@ function renderIndex(data) {
   // Trạng thái này lấy từ index đã commit trên backend, không lấy từ file đang chọn.
   ready = data.ready;
   $('#index-state').textContent = ready
-    ? 'Đã lập chỉ mục ' + data.documentCount + ' văn bản · ' + new Date(data.indexedAt).toLocaleString('vi-VN') + ' · TF-IDF'
+    ? 'Đã lập chỉ mục ' + data.documentCount + ' văn bản · ' + new Date(data.indexedAt).toLocaleString('vi-VN') + ' · Có thể đổi mô hình trên cùng chỉ mục'
     : 'Chưa có chỉ mục. Chọn JSON rồi bấm Tạo chỉ mục.';
   controls(busy);
 }
@@ -129,7 +130,7 @@ function renderResults(data) {
   // Backend đã xếp hạng; frontend chỉ dựng card theo đúng thứ tự trả về.
   $('#search-results').hidden = false;
   $('#result-summary').textContent = data.total
-    ? 'Hiển thị ' + data.results.length + '/' + data.total + ' kết quả · Điểm TF-IDF giảm dần'
+    ? 'Hiển thị ' + data.results.length + '/' + data.total + ' kết quả · ' + data.similarity + ' · ' + data.options.operator.toUpperCase() + ' · Điểm giảm dần'
     : 'Không có văn bản khớp truy vấn. Thử từ khác hoặc kiểm tra tập văn bản đã nạp.';
   $('#query-tokens').textContent = 'Token truy vấn: ' + data.tokens.join(' · ');
   $('#hits').replaceChildren(...data.results.map((hit, index) => {
@@ -147,7 +148,7 @@ function renderResults(data) {
       } catch { /* A source URL is optional and never executed as markup. */ }
     }
     card.append(element('p', hit.text.slice(0, 320) + (hit.text.length > 320 ? '…' : '')));
-    card.append(detail('Xem toàn bộ văn bản', hit.text), detail('Giải thích điểm TF-IDF', hit.explanation, 'pre'));
+    card.append(detail('Xem toàn bộ văn bản', hit.text), detail('Giải thích điểm · ' + data.similarity, hit.explanation, 'pre'));
     return card;
   }));
 }
@@ -159,7 +160,10 @@ $('#search-form').addEventListener('submit', async event => {
   $('#search-results').hidden = true;
   message('Đang tìm kiếm…');
   try {
-    const params = new URLSearchParams({ q: $('#query').value, limit: $('#limit').value });
+    const params = new URLSearchParams({ q: $('#query').value, limit: $('#limit').value,
+      model: $('#model').value, operator: $('#operator').value });
+    if ($('#model').value === 'bm25') { params.set('k1', $('#k1').value); params.set('b', $('#b').value); }
+    if ($('#model').value === 'lm') params.set('lambda', $('#lambda').value);
     renderResults(await api('/api/v1/search?' + params));
     message('Tìm kiếm hoàn tất.');
   } catch (error) { message(error.message, true); }
@@ -174,3 +178,21 @@ api('/api/v1/index').then(renderIndex).catch(error => {
   $('#index-state').textContent = 'Không kiểm tra được chỉ mục. Kiểm tra backend rồi tải lại trang.';
   message(error.message, true);
 });
+
+function updateSettings() {
+  const model = $('#model').value;
+  $('#bm25-params').hidden = model !== 'bm25';
+  $('#lm-params').hidden = model !== 'lm';
+  for (const id of ['model', 'operator', 'query', 'limit']) $('#' + id).disabled = busy;
+  for (const id of ['k1', 'b']) { $('#' + id).disabled = busy || model !== 'bm25'; $('#' + id).required = model === 'bm25'; }
+  $('#lambda').disabled = busy || model !== 'lm';
+  $('#lambda').required = model === 'lm';
+  $('#model-help').textContent = {
+    classic: 'TF-IDF Lucene: TF = sqrt(freq), IDF có làm mịn, chuẩn hóa theo độ dài trường. Giữ làm mốc so sánh.',
+    cosine: 'VSM lnc.ltc: log TF, IDF cho truy vấn và chuẩn hóa cosine. Điểm dùng tần suất từ lặp trong truy vấn.',
+    bm25: 'BM25: điều chỉnh k1 và b để quan sát ảnh hưởng của tần suất từ và độ dài văn bản.',
+    lm: 'LM: λ là trọng số mô hình văn bản theo slide; Lucene nhận 1 − λ. Điểm log không phải xác suất hoặc phần trăm.'
+  }[model];
+}
+$('#model').addEventListener('change', updateSettings);
+updateSettings();

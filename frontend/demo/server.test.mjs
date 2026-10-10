@@ -68,8 +68,8 @@ test('search page and JSON import proxy support larger corpora without raising e
   assert.equal((await fetch(`${demo}/api/v1/index`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })).status, 200);
   assert.equal(received[0].size, Buffer.byteLength(payload));
   assert.equal((await fetch(`${demo}/api/v1/index`)).status, 200);
-  assert.equal((await fetch(`${demo}/api/v1/search?q=lucene&limit=5`)).status, 200);
-  assert.equal(received[2].path, '/api/v1/search?q=lucene&limit=5');
+  assert.equal((await fetch(`${demo}/api/v1/search?q=lucene&limit=5&model=bm25&operator=and&k1=1&b=0.8`)).status, 200);
+  assert.equal(received[2].path, '/api/v1/search?q=lucene&limit=5&model=bm25&operator=and&k1=1&b=0.8');
   assert.equal((await fetch(`${demo}/api/v1/index`, { method: 'DELETE' })).status, 405);
   assert.equal((await fetch(`${demo}/api/v1/index`, { method: 'POST', body: 'x'.repeat(20 * 1024 * 1024 + 1) })).status, 413);
   assert.equal(received.length, 3);

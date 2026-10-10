@@ -1,4 +1,4 @@
-# Trình diễn tìm kiếm Lucene theo TF-IDF
+# Trình diễn tìm kiếm Lucene với nhiều mô hình
 
 Một backend Spring Boot chứa cả collector và search. Frontend demo dùng chung một Node server:
 `/` thu thập và `/search` tạo chỉ mục/tìm kiếm. Hai màn hình có thanh điều hướng chung.
@@ -68,7 +68,7 @@ Chạy một backend ghi vào mỗi thư mục chỉ mục.
 |---|---|---|
 | GET /api/v1/index | Không có | ready, documentCount, indexedAt, similarity |
 | POST /api/v1/index | Body là mảng JSON; Content-Type: application/json | Trạng thái chỉ mục sau thay thế |
-| GET /api/v1/search?q=lucene&limit=10 | q: 1–500 ký tự; limit: 1–50 | query, tokens, total, limit, similarity, results |
+| GET /api/v1/search?q=lucene&limit=10 | q: 1–500 ký tự; limit: 1–50 | query, tokens, total, limit, similarity, options, results |
 
 Mỗi kết quả có `id`, `title`, `url`, `text`, `score`, `explanation`.
 `total` là số văn bản khớp chính xác; `results` chỉ chứa tối đa `limit` mục.
@@ -83,7 +83,7 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8080/api/v1/index -ContentT
 Invoke-RestMethod -Uri 'http://127.0.0.1:8080/api/v1/search?q=lucene&limit=10'
 ```
 
-## Phương pháp và phạm vi
+## Phương pháp mặc định (Classic TF-IDF)
 
 Apache Lucene 10.3.1; `ClassicSimilarity` được đặt trên cả IndexWriter và IndexSearcher.
 Tiêu đề và nội dung ghép vào một trường `content`, không boost riêng tiêu đề.
@@ -113,3 +113,53 @@ khi tạo chỉ mục lớn, truy vấn đợi hoàn tất. Chưa có job nền,
 Test: `SearchServiceTest` kiểm tra công thức điểm, ranking, persistence, thay thế, dữ liệu lỗi và collector JSON.
 `SearchApiTest` kiểm tra API, body cố định/chunked quá lớn, validation.
 Frontend proxy test kiểm tra các route mới và giới hạn upload riêng.
+
+
+## Chọn mô hình và tham số trên màn hình
+
+Trong “Cấu hình tìm kiếm”, chọn mô hình, điều kiện OR/AND và Top K. Chỉ tham số
+của mô hình đang chọn được hiển thị. Không cần tạo lại chỉ mục khi đổi mô hình.
+API cũ không truyền option vẫn dùng Classic TF-IDF + OR.
+
+| Query parameter | Mặc định | Giá trị |
+|---|---|---|
+| `model` | `classic` | `classic`, `cosine`, `bm25`, `lm` |
+| `operator` | `or` | `or`: ít nhất một token; `and`: tất cả token |
+| `k1` | `1.2` | Số hữu hạn >= 0; bão hòa TF của BM25 |
+| `b` | `0.75` | Số hữu hạn trong [0,1]; chuẩn hóa độ dài BM25 |
+| `lambda` | `0.5` | Số hữu hạn trong (0,1); trọng số mô hình văn bản LM |
+
+Ví dụ: `/api/v1/search?q=học%20bổng&model=bm25&operator=and&k1=1&b=0.8&limit=5`.
+Response thêm `options` chứa cấu hình đã dùng. `similarity` ghi mô hình cùng tham số;
+`explanation` dùng đúng mô hình đang chọn. Option sai trả HTTP 400; không chấp nhận
+NaN/Infinity. Giao diện giới hạn λ từ 0.01 đến 0.99 để tránh hai đầu suy biến.
+
+- `classic`: ClassicSimilarity như trước; token truy vấn lặp chỉ tính một lần.
+- `cosine`: SMART **lnc.ltc**, log tự nhiên. Văn bản: `wd = 1 + ln(tf_d)`, không IDF.
+  Truy vấn: `wq = (1 + ln(tf_q)) * ln(N/df)`. Điểm là tích vô hướng chia tích chuẩn
+  L2. Chuẩn văn bản tính trên **toàn bộ từ** trong trường content (title + text).
+  Từ ngoài từ vựng corpus bị bỏ qua. Nếu chuẩn truy vấn bằng 0 (ví dụ mọi từ đều
+  có df=N), quy ước score=0, giữ các tài liệu khớp và giải thích rõ. Xếp hạng hòa
+  theo docID Lucene tăng dần. Đọc TF qua postings nên dùng được chỉ mục cũ.
+- `bm25`: BM25Similarity của Lucene; IDF = `ln(1 + (N-df+0.5)/(df+0.5))`.
+  Dùng explain để đối chiếu phép tính thật; không mặc định điểm số giống mọi
+  biến thể BM25 trong bài giảng. `k1=0` bỏ ảnh hưởng tần suất lặp; `b=0` bỏ hiệu
+  chỉnh độ dài, `b=1` hiệu chỉnh đầy đủ.
+- `lm`: LMJelinekMercerSimilarity của Lucene. Theo quy ước slide,
+  `P(t|d) = lambda * P(t|Md) + (1-lambda) * P(t|Mc)`.
+  Lucene nhận **1-lambda** làm trọng số nền. Lucene dùng điểm log và ước lượng
+  xác suất corpus có làm mịn, không trả xác suất thô. Điểm chỉ tích lũy trên
+  các token khớp; OR/AND giới hạn tập ứng viên, không chấm mọi tài liệu trong corpus.
+
+VSM giữ tần suất từ trong truy vấn; các mô hình Lucene dùng mỗi token một lần,
+không áp dụng trọng số tần suất truy vấn k3. Analyzer vẫn là StandardAnalyzer,
+giữ dấu, không tách từ tiếng Việt nhiều âm tiết. Chưa có so sánh hai bảng, hợp nhất
+kết quả hoặc chế độ không dấu.
+
+Cosine hiện quét postings và tính chuẩn vector mỗi truy vấn, lấy toàn bộ ứng viên
+trước khi chọn Top K. Phù hợp demo corpus nhỏ; cần cache chuẩn vector theo commit
+và cải tiến thu thập Top K khi corpus lớn. Không chỉ lấy Top K Classic để xếp lại.
+
+Tham khảo chính thức:
+[BM25Similarity](https://lucene.apache.org/core/10_3_1/core/org/apache/lucene/search/similarities/BM25Similarity.html),
+[LMJelinekMercerSimilarity](https://lucene.apache.org/core/10_3_1/core/org/apache/lucene/search/similarities/LMJelinekMercerSimilarity.html).

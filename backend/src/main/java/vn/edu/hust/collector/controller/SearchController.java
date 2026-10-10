@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.edu.hust.collector.dto.*;
 import vn.edu.hust.collector.service.SearchService;
 
-/** Endpoint trạng thái, tạo chỉ mục và tìm kiếm TF-IDF. */
+/** Endpoint trạng thái, tạo chỉ mục và tìm kiếm với mô hình/tham số tùy chọn. */
 @RestController
 @RequestMapping("/api/v1")
 public class SearchController {
@@ -29,8 +29,13 @@ public class SearchController {
 
     @GetMapping("/search")
     public SearchResponse search(@RequestParam(defaultValue = "") String q,
-                                 @RequestParam(defaultValue = "10") int limit) throws IOException {
-        return service.search(q, limit);
+                                 @RequestParam(defaultValue = "10") int limit,
+                                 @RequestParam(defaultValue = "classic") String model,
+                                 @RequestParam(defaultValue = "or") String operator,
+                                 @RequestParam(defaultValue = "1.2") float k1,
+                                 @RequestParam(defaultValue = "0.75") float b,
+                                 @RequestParam(defaultValue = "0.5") float lambda) throws IOException {
+        return service.search(q, limit, new SearchOptions(model, operator, k1, b, lambda));
     }
 
     @ExceptionHandler(IOException.class)

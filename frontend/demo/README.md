@@ -54,5 +54,5 @@ Trên macOS/Linux dùng `npm --prefix frontend/demo test`.
 Sửa HTML/CSS/JS: tải lại trình duyệt, dùng Ctrl+F5 nếu còn cache.
 Sửa `server.mjs`: khởi động lại Node. Sửa Java: dừng backend, build rồi chạy lại.
 
-Hướng dẫn thao tác: [thu thập](../../docs/demo.md), [TF-IDF](../../docs/search.md).
+Hướng dẫn thao tác: [thu thập](../../docs/demo.md), [tìm kiếm và chọn mô hình](../../docs/search.md).
 Thiết kế tương lai: [OCR](../../docs/ocr-design.md), chưa có API hoặc nút OCR.

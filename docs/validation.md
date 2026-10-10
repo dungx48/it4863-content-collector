@@ -1,5 +1,21 @@
 # Kiểm thử và phạm vi xác nhận
 
+## Kiểm tra lựa chọn mô hình — 10/10/2026
+
+- `mvn -q verify` đạt toàn bộ 22 test Java tại thời điểm build JAR.
+- Sau đó thêm một test Top K hồi quy và chạy lại `SearchServiceTest`: 7/7 đạt.
+  Tổng số test Java hiện tại là 23; các lớp còn lại đạt ở lượt verify trên.
+- 7/7 test Node đạt; proxy giữ nguyên model/operator/k1/b trong query string.
+- Đối chiếu điểm VSM, BM25 và LM với công thức trên corpus nhỏ; kiểm tra ảnh hưởng
+  tham số, AND, tần suất truy vấn, từ ngoài từ vựng và vector truy vấn bằng 0.
+- Smoke test Chrome trên backend/JAR mới với chỉ mục tạm: nạp mẫu, tạo chỉ mục,
+  cả bốn mô hình, giải thích điểm, thay k1/b, AND không khớp và validation k1 âm đạt.
+- Bố cục 390px được xem ảnh và kiểm tra không có tràn ngang; tham số chỉ hiện theo mô hình.
+- Không crawl dữ liệu mới hoặc thay chỉ mục người dùng trong lượt kiểm tra này.
+
+Các kết quả dưới đây là lịch sử kiểm tra của các thay đổi trước.
+
+
 Cập nhật theo refactor một backend ngày 10/09/2026.
 
 ## Lệnh kiểm thử
