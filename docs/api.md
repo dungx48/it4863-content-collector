@@ -1,6 +1,6 @@
 # Collector HTTP API
 
-API tạo chỉ mục và tìm kiếm TF-IDF: [search.md](search.md).
+API tạo chỉ mục và tìm kiếm (Classic TF-IDF, VSM cosine, BM25, LM): [search.md](search.md).
 
 Backend mặc định: `http://127.0.0.1:8080`. Không phục vụ HTML, CSS hoặc JavaScript.
 Frontend demo là client riêng tại port 3000. Endpoint cũ `/api/extract` vẫn là alias để giữ tương thích.

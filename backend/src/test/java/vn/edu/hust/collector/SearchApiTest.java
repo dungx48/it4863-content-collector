@@ -34,6 +34,15 @@ class SearchApiTest {
             .andExpect(status().isBadRequest()).andExpect(jsonPath("$.reason").value("INVALID_CORPUS"));
         mvc.perform(post("/api/v1/index").contentType("text/plain").content("[]"))
             .andExpect(status().isUnsupportedMediaType());
+        for (String model : new String[]{"classic", "cosine", "bm25", "lm"})
+            mvc.perform(get("/api/v1/search").param("q", "học").param("model", model).param("operator", "and"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.options.model").value(model))
+                .andExpect(jsonPath("$.options.operator").value("and"));
+        for (String[] option : new String[][]{{"model", "unknown"}, {"operator", "not"}, {"k1", "-1"},
+                {"k1", "NaN"}, {"k1", "Infinity"}, {"b", "1.1"}, {"b", "NaN"}, {"lambda", "0"},
+                {"lambda", "1"}, {"lambda", "NaN"}, {"k1", "oops"}})
+            mvc.perform(get("/api/v1/search").param("q", "học").param(option[0], option[1]))
+                .andExpect(status().isBadRequest());
         byte[] tooLarge = new byte[SearchController.MAX_CORPUS_BYTES + 1];
         mvc.perform(post("/api/v1/index").contentType("application/json").content(tooLarge))
             .andExpect(status().is(413));

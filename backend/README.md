@@ -39,5 +39,6 @@ Repository hiện lưu file; chưa dùng database. Chi tiết schema và status:
 [API](../docs/api.md), [kiến trúc](../docs/architecture.md).
 
 Tính năng tìm kiếm nằm trong cùng backend: SearchController → SearchService → LuceneIndexRepository.
-Chỉ mục Lucene lưu trên ổ đĩa, xếp hạng bằng ClassicSimilarity (TF-IDF).
+Chỉ mục Lucene lưu trên ổ đĩa. Chọn Classic TF-IDF, VSM cosine lnc.ltc, BM25 (k1/b),
+hoặc LM Jelinek–Mercer (lambda), kết hợp AND/OR mà không cần tạo lại chỉ mục.
 Xem [hướng dẫn tạo chỉ mục/tìm kiếm](../docs/search.md).

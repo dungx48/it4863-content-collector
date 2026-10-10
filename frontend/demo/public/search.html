@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ctrl+F — Tìm kiếm TF-IDF</title>
+  <title>Ctrl+F — Tìm kiếm văn bản</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/search.css">
 </head>
@@ -12,15 +12,15 @@
     <a class="brand" href="/"><span class="brand-mark">C<span>+</span>F</span><span><strong>Ctrl+F</strong><small>Nhóm N06 · IT4863</small></span></a>
     <nav class="screen-nav" aria-label="Màn hình demo">
       <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"/></svg>Thu thập</a>
-      <a href="/search" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>Tìm kiếm TF-IDF</a>
+      <a href="/search" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>Tìm kiếm văn bản</a>
     </nav>
   </header>
   <main>
     <section class="hero">
       <p class="eyebrow">TRÌNH DIỄN TÌM KIẾM · APACHE LUCENE</p>
       <h1>Từ tập văn bản<br><em>đến kết quả phù hợp.</em></h1>
-      <p class="lead">Nạp dữ liệu JSON, tạo chỉ mục và tìm kiếm theo TF-IDF. Xem điểm số và cách từng từ đóng góp vào thứ hạng.</p>
-      <div class="pipeline" aria-label="Quy trình"><span>01 · Văn bản JSON</span><span>→</span><span>02 · Chỉ mục Lucene</span><span>→</span><span>03 · Kết quả TF-IDF</span></div>
+      <p class="lead">Nạp dữ liệu JSON, tạo chỉ mục và thử các mô hình xếp hạng. Xem điểm số và cách từng từ đóng góp vào thứ hạng.</p>
+      <div class="pipeline" aria-label="Quy trình"><span>01 · Văn bản JSON</span><span>→</span><span>02 · Chỉ mục Lucene</span><span>→</span><span>03 · Kết quả xếp hạng</span></div>
     </section>
     <section class="search-panel" aria-labelledby="index-heading">
       <p class="eyebrow">BƯỚC 01</p>
@@ -50,9 +50,42 @@
           <select id="limit"><option>5</option><option selected>10</option><option>20</option><option>50</option></select>
           <button id="search-button" type="submit" disabled>Tìm kiếm</button>
         </div>
+        <fieldset class="search-settings">
+          <legend>Cấu hình tìm kiếm</legend>
+          <div class="settings-grid">
+            <label>Mô hình xếp hạng
+              <select id="model">
+                <option value="classic">TF-IDF Lucene (Classic)</option>
+                <option value="cosine">VSM cosine (lnc.ltc)</option>
+                <option value="bm25">Okapi BM25 (Lucene)</option>
+                <option value="lm">LM Jelinek–Mercer (Lucene)</option>
+              </select>
+            </label>
+            <label>Điều kiện khớp
+              <select id="operator"><option value="or">OR — ít nhất một từ</option><option value="and">AND — tất cả các từ</option></select>
+            </label>
+          </div>
+          <div id="bm25-params" class="settings-grid" hidden>
+            <label>k1 — bão hòa tần suất từ
+              <input id="k1" type="number" min="0" step="any" value="1.2" disabled>
+              <span class="hint">k1 = 0 bỏ ảnh hưởng số lần lặp; k1 lớn làm TF bão hòa chậm hơn.</span>
+            </label>
+            <label>b — chuẩn hóa độ dài
+              <input id="b" type="number" min="0" max="1" step="any" value="0.75" disabled>
+              <span class="hint">0: không chuẩn hóa độ dài; 1: chuẩn hóa đầy đủ.</span>
+            </label>
+          </div>
+          <div id="lm-params" class="settings-grid" hidden>
+            <label>λ — trọng số mô hình văn bản
+              <input id="lambda" type="number" min="0.01" max="0.99" step="any" value="0.5" disabled>
+              <span class="hint">P(t|d) = λ P(t|Md) + (1 − λ) P(t|Mc), theo slide. λ lớn làm mịn yếu hơn.</span>
+            </label>
+          </div>
+          <p id="model-help" class="hint" aria-live="polite"></p>
+        </fieldset>
       </form>
       <div class="search-actions query-examples"><span>Thử với bộ mẫu:</span><button type="button" data-query="học bổng">học bổng</button><button type="button" data-query="lucene">lucene</button><button type="button" data-query="thực tập">thực tập</button></div>
-      <p class="hint">Tìm trong tiêu đề + nội dung. Khớp ít nhất một token (OR), không phân biệt hoa/thường, có phân biệt dấu tiếng Việt. Từ lặp trong truy vấn chỉ tính một lần.</p>
+      <p class="hint">Tìm trong tiêu đề + nội dung. Không phân biệt hoa/thường, có phân biệt dấu tiếng Việt. VSM tính tần suất từ lặp trong truy vấn; các mô hình Lucene dùng mỗi token truy vấn một lần.</p>
     </section>
     <p id="search-message" role="status" aria-live="polite"></p>
     <section id="search-results" hidden aria-labelledby="results-heading">
@@ -62,14 +95,17 @@
       <div id="hits"></div>
     </section>
     <details class="search-panel">
-      <summary>Giải thích phương pháp TF-IDF</summary>
+      <summary>Giải thích các mô hình xếp hạng</summary>
       <p>Lucene dùng <strong>ClassicSimilarity</strong>. TF tăng theo căn bậc hai số lần xuất hiện; IDF cao hơn với từ xuất hiện trong ít văn bản. Điểm còn được chuẩn hóa theo độ dài trường văn bản.</p>
       <p><code>tf = sqrt(freq)</code> · <code>idf = 1 + ln((N + 1) / (df + 1))</code> · <code>lengthNorm = 1 / sqrt(length)</code></p>
+      <p><strong>VSM cosine (lnc.ltc):</strong> văn bản dùng 1 + ln(TF), không IDF, chuẩn hóa vector; truy vấn dùng 1 + ln(TF), IDF = ln(N/df), chuẩn hóa vector. Chuẩn văn bản tính trên toàn bộ từ, không chỉ từ truy vấn. Từ ngoài từ vựng bị bỏ qua; vector truy vấn bằng 0 thì điểm bằng 0.</p>
+      <p><strong>BM25:</strong> điều khiển bão hòa TF bằng k1 và chuẩn hóa độ dài bằng b. Đây là biến thể BM25 của Lucene; IDF và thang điểm có thể khác công thức minh họa trong slide.</p>
+      <p><strong>LM Jelinek–Mercer:</strong> kết hợp mô hình văn bản và corpus. Giao diện dùng λ của văn bản theo slide; backend chuyển thành 1 − λ cho Lucene. Điểm là điểm log do Lucene tính, không phải xác suất thô. AND/OR vẫn giới hạn tập văn bản được trả về.</p>
       <p>Mở “Giải thích điểm” ở từng kết quả để xem phép tính thực tế của Lucene. Điểm không phải phần trăm chính xác; chỉ so sánh trong cùng truy vấn và cùng chỉ mục.</p>
       <p>Văn bản và truy vấn được chuẩn hóa Unicode NFC rồi phân tích bằng StandardAnalyzer. Chưa ghép từ tiếng Việt nhiều âm tiết, bỏ dấu, stemming hay tìm kiếm ngữ nghĩa.</p>
     </details>
   </main>
-  <footer><span>Đại học Bách khoa Hà Nội</span><span>Spring Boot · Apache Lucene · TF-IDF</span></footer>
+  <footer><span>Đại học Bách khoa Hà Nội</span><span>Spring Boot · Apache Lucene · Tìm kiếm thông tin</span></footer>
   <script src="/search.js" type="module"></script>
 </body>
 </html>
