@@ -36,20 +36,22 @@ Frontend demo :3000 → HTTP → Backend :8080
 
 - JDK 21 trở lên.
 - Maven 3.9 trở lên.
+- Node.js 22 trở lên để chạy frontend demo và launcher.
 - Có mạng khi Maven cần tải dependency và khi thu thập website.
 
 Kiểm tra môi trường:
 
-```powershell
+```text
 java -version
 mvn -version
+node -version
 ```
 
 ## Build
 
 Chạy tại thư mục có `pom.xml`:
 
-```powershell
+```text
 mvn clean verify
 ```
 
@@ -57,28 +59,36 @@ Kết quả là JAR kèm dependency tại `backend/target/collector.jar`.
 
 ## Chạy backend và frontend demo
 
-Chạy cả hai bằng một lệnh tại repository root (sau khi build):
+Chạy cả hai bằng một lệnh tại repository root (sau khi build). Chọn lệnh đúng
+với hệ điều hành đang dùng:
+
+Windows (PowerShell hoặc Command Prompt):
 
 ```powershell
 .\start.cmd
 ```
 
+macOS hoặc Linux:
+
+```bash
+node scripts/dev.mjs
+```
+
 Launcher chờ backend sẵn sàng rồi mở frontend. Truy cập http://localhost:3000;
 nhấn `Ctrl+C` để dừng cả hai. Nếu một tiến trình lỗi, tiến trình còn lại cũng được dừng.
-Không cần Docker hoặc npm install. Khi sửa Java, chạy lại `mvn verify` trước khi khởi động.
-Trên macOS/Linux có thể dùng `node scripts/dev.mjs`.
+Không cần Docker hoặc `npm install`. Khi sửa Java, chạy lại `mvn verify` trước khi khởi động.
 
 Hoặc chạy từng tiến trình riêng:
 
-Terminal 1 — backend API độc lập:
+Terminal 1 — backend API độc lập (Windows, macOS và Linux):
 
-```powershell
+```text
 java -jar backend/target/collector.jar --serve 8080
 ```
 
-Terminal 2 — frontend demo (Node.js 22+, không cần npm install):
+Terminal 2 — frontend demo (Windows, macOS và Linux; không cần `npm install`):
 
-```powershell
+```text
 node frontend/demo/server.mjs
 ```
 
